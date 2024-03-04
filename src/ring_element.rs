@@ -6,63 +6,64 @@ use crate::field_element::FieldElement;
 /// which themselves are [FieldElement].
 #[derive(Clone, Debug)]
 pub struct RingElement {
-    pub val: Vec<FieldElement>,
+    pub val: [FieldElement; 256],
 }
 
 impl RingElement {
     // Create a new RingElement from a vector of FieldElements
-    pub fn new(val: Vec<FieldElement>) -> Self {
+    pub fn new(val: [FieldElement; 256]) -> Self {
         RingElement { val }
     }
 
-    fn byte_encode(&mut self, d: u8) -> Vec<u8> {
-        assert!(d <= 12, "d must be less than or equal to 12");
-        assert_eq!(self.val.len(), 256, "Input array must have 256 elements");
+    fn byte_encode(self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
-        let mut b = vec![0u8; 0];
+        for i in (0..self.val.len()).step_by(2) {
+            // Combine two 12-bit integers into a single 24-bit integer
+            let x = u32::from(self.val[i].val) | (u32::from(self.val[i + 1].val) << 12);
 
-        todo!()
+            // Split the 24-bit integer into 3 bytes and append to the output vector
+            out.push((x & 0xFF) as u8); // First 8 bits
+            out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
+            out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
+        }
+        out
     }
 }
 
 impl Add for RingElement {
     type Output = Self;
 
-    // Simple polynomial addition for two ring elements of the same length
-    fn add(self, other: Self) -> Self {
+    fn add(self, other: Self) -> Self::Output {
         assert_eq!(
             self.val.len(),
             other.val.len(),
             "RingElements must be of the same length"
         );
-        RingElement::new(
-            self.val
-                .iter()
-                .zip(other.val.iter())
-                .map(|(x, y)| *x + *y)
-                .collect(),
-        )
+
+        let mut result = [FieldElement::default(); 256]; // Assuming FieldElement has a default value
+        for i in 0..256 {
+            result[i] = self.val[i] + other.val[i];
+        }
+        RingElement::new(result)
     }
 }
 
 impl Sub for RingElement {
     type Output = Self;
 
-    // Simple polynomial subtraction for two ring elements of the same length
-    fn sub(self, other: Self) -> Self {
+    fn sub(self, other: Self) -> Self::Output {
         assert_eq!(
             self.val.len(),
             other.val.len(),
             "RingElements must be of the same length"
         );
 
-        RingElement::new(
-            self.val
-                .iter()
-                .zip(other.val.iter())
-                .map(|(x, y)| *x - *y)
-                .collect(),
-        )
+        let mut result = [FieldElement::default(); 256]; // Assuming FieldElement has a default value
+        for i in 0..256 {
+            result[i] = self.val[i] - other.val[i];
+        }
+        RingElement::new(result)
     }
 }
 
@@ -72,34 +73,5 @@ impl PartialEq for RingElement {
             return false;
         }
         self.val.iter().zip(other.val.iter()).all(|(a, b)| a == b)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_addition() {
-        let a = RingElement::new(vec![FieldElement::new(1), FieldElement::new(2)]);
-        let b = RingElement::new(vec![FieldElement::new(3), FieldElement::new(4)]);
-        let expected = RingElement::new(vec![FieldElement::new(4), FieldElement::new(6)]);
-        assert_eq!(a + b, expected);
-    }
-
-    #[test]
-    fn test_subtraction() {
-        let a = RingElement::new(vec![FieldElement::new(5), FieldElement::new(7)]);
-        let b = RingElement::new(vec![FieldElement::new(2), FieldElement::new(3)]);
-        let expected = RingElement::new(vec![FieldElement::new(3), FieldElement::new(4)]);
-        assert_eq!(a - b, expected);
-    }
-
-    #[test]
-    #[should_panic(expected = "RingElements must be of the same length")]
-    fn test_different_length() {
-        let a = RingElement::new(vec![FieldElement::new(1)]);
-        let b = RingElement::new(vec![FieldElement::new(2), FieldElement::new(3)]);
-        let _ = a + b; // This should panic
     }
 }

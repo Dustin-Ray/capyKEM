@@ -1,6 +1,7 @@
 pub mod ml_kem_constants {
-    pub const q: u16 = 3329;
-    pub const n: u16 = 256;
+    pub const Q: u16 = 3329;
+    pub const N: u16 = 256;
+    pub const ENCODE_SIZE_12: u16 = N * 12 / 8;
 }
 
 pub mod barrett_constants {

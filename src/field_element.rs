@@ -7,7 +7,7 @@ use std::ops::{Add, Mul, Sub};
 
 use crate::constants::{
     barrett_constants::MULTIPLIER as bar_mul, barrett_constants::SHIFT as bar_shift,
-    ml_kem_constants::q,
+    ml_kem_constants::Q,
 };
 
 pub enum OperationError {
@@ -25,8 +25,12 @@ impl FieldElement {
         Self { val }
     }
 
+    pub fn default() -> Self {
+        FieldElement { val: 0 }
+    }
+
     fn check_reduced(self) -> Result<Self, OperationError> {
-        if self.val > q {
+        if self.val > Q {
             Err(OperationError::UnreducedFieldElementError)
         } else {
             Ok(self)
@@ -39,12 +43,12 @@ impl FieldElement {
         let quotient = dividend
             .wrapping_mul(bar_mul.into())
             .wrapping_shr(bar_shift as u32);
-        let remainder = dividend.wrapping_sub(quotient.wrapping_mul(q.into()));
+        let remainder = dividend.wrapping_sub(quotient.wrapping_mul(Q.into()));
         let mut adjusted_quotient = quotient;
-        if remainder > (q / 2).into() {
+        if remainder > (Q / 2).into() {
             adjusted_quotient = adjusted_quotient.wrapping_add(1);
         }
-        if remainder > (q + q / 2).into() {
+        if remainder > (Q + Q / 2).into() {
             adjusted_quotient = adjusted_quotient.wrapping_add(1);
         }
         let mask = (1u64 << d) - 1;
@@ -54,21 +58,21 @@ impl FieldElement {
     /// FIPS 203 (DRAFT), Definition 4.6
     pub fn decompress(&self, d: u8) -> u16 {
         let dividend = self.val as u32;
-        let dividend = dividend.wrapping_mul(q.into());
+        let dividend = dividend.wrapping_mul(Q.into());
         let mut quotient = dividend.wrapping_shr(d.into());
         quotient = quotient.wrapping_add((dividend.wrapping_shr((d - 1).into())) & 1);
         quotient as u16
     }
 
     fn reduce_once(self) -> Self {
-        let mut x = self.val.wrapping_sub(q);
-        x = x.wrapping_add((x >> 15).wrapping_mul(q));
+        let mut x = self.val.wrapping_sub(Q);
+        x = x.wrapping_add((x >> 15).wrapping_mul(Q));
         Self::new(x)
     }
 
     fn barrett_reduce(product: u32) -> Self {
         let quotient: u32 = ((product as u64 * bar_mul as u64) >> bar_shift) as u32;
-        Self::new((product as u32 - quotient * q as u32) as u16).reduce_once()
+        Self::new((product as u32 - quotient * Q as u32) as u16).reduce_once()
     }
 }
 
@@ -99,7 +103,7 @@ impl Sub for FieldElement {
         // If `self.val` is less than `other.val`, adding `q`
         // ensures the result stays positive and wraps around correctly.
         let result = if self.val < other.val {
-            self.val + q - other.val
+            self.val + Q - other.val
         } else {
             self.val - other.val
         };
@@ -109,16 +113,16 @@ impl Sub for FieldElement {
 
 #[cfg(test)]
 mod tests {
-    use super::q;
+    use super::Q;
     use super::*;
 
     #[test]
     fn exhaustive_test_reduce_once() {
-        for i in q + 1..=2 * q {
+        for i in Q + 1..=2 * Q {
             let element = FieldElement::new(i);
             let reduced_element = element.reduce_once();
             assert!(
-                reduced_element.val <= q,
+                reduced_element.val <= Q,
                 "Value should be reduced within [0, q] range for input: {i}, but got: {}",
                 reduced_element.val
             );
@@ -178,12 +182,12 @@ mod tests {
 
     #[test]
     fn test_check_reduced_ok() {
-        assert!(FieldElement::new(q - 1).check_reduced().is_ok());
+        assert!(FieldElement::new(Q - 1).check_reduced().is_ok());
     }
 
     #[test]
     fn test_check_reduced_err() {
-        assert!(FieldElement::new(q + 1).check_reduced().is_err());
+        assert!(FieldElement::new(Q + 1).check_reduced().is_err());
     }
 
     // Test that verifies compression into a range with d = 10, where q is assumed to be 3329.
