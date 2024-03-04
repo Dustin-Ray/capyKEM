@@ -2,6 +2,8 @@ use std::ops::{Add, Sub};
 
 use crate::field_element::FieldElement;
 
+/// A polynomial is an element of the ring R. It is an array of 256 coefficients
+/// which themselves are [FieldElement].
 #[derive(Clone, Debug)]
 pub struct RingElement {
     pub val: Vec<FieldElement>,
@@ -11,6 +13,15 @@ impl RingElement {
     // Create a new RingElement from a vector of FieldElements
     pub fn new(val: Vec<FieldElement>) -> Self {
         RingElement { val }
+    }
+
+    fn byte_encode(&mut self, d: u8) -> Vec<u8> {
+        assert!(d <= 12, "d must be less than or equal to 12");
+        assert_eq!(self.val.len(), 256, "Input array must have 256 elements");
+
+        let mut b = vec![0u8; 0];
+
+        todo!()
     }
 }
 
