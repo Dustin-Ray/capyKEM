@@ -29,7 +29,7 @@ impl FieldElement {
         FieldElement { val: 0 }
     }
 
-    fn check_reduced(self) -> Result<Self, OperationError> {
+    pub fn check_reduced(self) -> Result<Self, OperationError> {
         if self.val > Q {
             Err(OperationError::UnreducedFieldElementError)
         } else {
@@ -64,7 +64,7 @@ impl FieldElement {
         quotient as u16
     }
 
-    fn reduce_once(self) -> Self {
+    pub fn reduce_once(self) -> Self {
         let mut x = self.val.wrapping_sub(Q);
         x = x.wrapping_add((x >> 15).wrapping_mul(Q));
         Self::new(x)
