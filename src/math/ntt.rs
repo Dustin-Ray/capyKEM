@@ -1,5 +1,5 @@
-use super::{field_element::FieldElement, ring_element::RingElement};
-use crate::constants::{ml_kem_constants::Q, K_INVERSE_NTT_ROOTS, K_NTT_ROOTS};
+use super::field_element::FieldElement;
+use crate::constants::{ml_kem_constants::Q, K_NTT_ROOTS};
 use core::fmt;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
