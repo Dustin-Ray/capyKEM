@@ -72,7 +72,7 @@ impl FieldElement {
 
     fn barrett_reduce(product: u32) -> Self {
         let quotient: u32 = ((product as u64 * bar_mul as u64) >> bar_shift) as u32;
-        Self::new((product as u32 - quotient * Q as u32) as u16).reduce_once()
+        Self::new((product - quotient * Q as u32) as u16).reduce_once()
     }
 }
 
@@ -83,6 +83,16 @@ impl Mul<u16> for FieldElement {
         // Perform multiplication in a larger integer type to handle overflow
         let product = (self.val as u32) * (other as u32);
         Self::barrett_reduce(product)
+    }
+}
+
+impl Mul<FieldElement> for u16 {
+    type Output = Self;
+
+    fn mul(self, other: FieldElement) -> Self {
+        // Perform multiplication in a larger integer type to handle overflow
+        let product = (other.val as u32) * (self as u32);
+        FieldElement::barrett_reduce(product).val
     }
 }
 

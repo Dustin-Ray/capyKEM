@@ -1,6 +1,14 @@
 use std::ops::{Add, Sub};
 
-use crate::{constants::ml_kem_constants, math::field_element::FieldElement};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake256,
+};
+
+use crate::{
+    constants::ml_kem_constants::{self, N},
+    math::field_element::FieldElement,
+};
 
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [FieldElement].
@@ -57,6 +65,45 @@ impl RingElement {
 
         Ok(f)
     }
+
+    fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
+        let mut prf = Shake256::default();
+        prf.update(s);
+        prf.update(&[b]);
+
+        let mut b = [0u8; (N / 2) as usize];
+        let mut reader = prf.finalize_xof();
+        reader.read(&mut b);
+
+        // dbg!(b.clone());
+
+        let mut f = [FieldElement::new(0); N as usize];
+        for i in 0..N {
+            let b = b[(i / 2) as usize];
+            let bits = [
+                (b >> 7) & 1,
+                (b >> 6) & 1,
+                (b >> 5) & 1,
+                (b >> 4) & 1,
+                (b >> 3) & 1,
+                (b >> 2) & 1,
+                (b >> 1) & 1,
+                b & 1,
+            ];
+
+            // The i-th coefficient is based on the first four bits
+            // The (i+1)-th coefficient is based on the second four bits
+            if i % 2 == 0 {
+                f[i as usize] = FieldElement::new((bits[0] + bits[1]).into())
+                    - FieldElement::new((bits[2] + bits[3]).into());
+            } else {
+                f[i as usize] = FieldElement::new((bits[4] + bits[5]).into())
+                    - FieldElement::new((bits[2] + bits[3]).into());
+            }
+        }
+        // dbg!(f.clone());
+        RingElement::new(f)
+    }
 }
 
 impl Add for RingElement {
@@ -70,8 +117,8 @@ impl Add for RingElement {
         );
 
         let mut result = [FieldElement::default(); 256]; // Assuming FieldElement has a default value
-        for i in 0..256 {
-            result[i] = self.val[i] + other.val[i];
+        for (i, item) in self.val.iter().enumerate().take(256) {
+            result[i] = *item + other.val[i];
         }
         RingElement::new(result)
     }
@@ -88,8 +135,8 @@ impl Sub for RingElement {
         );
 
         let mut result = [FieldElement::default(); 256]; // Assuming FieldElement has a default value
-        for i in 0..256 {
-            result[i] = self.val[i] - other.val[i];
+        for (i, item) in self.val.iter().enumerate().take(256) {
+            result[i] = *item - other.val[i];
         }
         RingElement::new(result)
     }
