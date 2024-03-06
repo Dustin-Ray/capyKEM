@@ -96,6 +96,16 @@ impl Mul<FieldElement> for u16 {
     }
 }
 
+impl Mul<FieldElement> for FieldElement {
+    type Output = Self;
+
+    fn mul(self, other: FieldElement) -> Self {
+        // Perform multiplication in a larger integer type to handle overflow
+        let product = (other.val as u32) * (self.val as u32);
+        FieldElement::barrett_reduce(product)
+    }
+}
+
 impl Add for FieldElement {
     type Output = Self;
 
