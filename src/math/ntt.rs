@@ -88,7 +88,7 @@ impl NttElement {
             }
             len *= 2;
         }
-        for (_i, item) in self.0.iter_mut().enumerate() {
+        for item in self.0.iter_mut() {
             *item = (*item * 3303).reduce_once();
         }
     }
