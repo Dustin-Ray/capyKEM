@@ -1,13 +1,14 @@
-use super::field_element::FieldElement as F;
+use super::{field_element::FieldElement as F, ring_element::RingElement};
 use crate::constants::{ml_kem_constants::Q, K_MOD_ROOTS, K_NTT_ROOTS};
 use core::fmt;
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake256,
 };
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct NttElement([F; 256]);
 
+// display in a grid-shape
 impl fmt::Debug for NttElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.0.iter().enumerate() {
@@ -23,6 +24,12 @@ impl fmt::Debug for NttElement {
 }
 
 impl NttElement {
+    fn new(r: &mut RingElement) -> Self {
+        let mut ntt_el = NttElement(r.val);
+        ntt_el.ntt();
+        ntt_el
+    }
+
     fn default() -> Self {
         NttElement([F::default(); 256])
     }
@@ -56,32 +63,39 @@ impl NttElement {
             }
             i += 3
         }
-        NttElement(a_hat)
+
+        {
+            let mut t_q = NttElement(a_hat);
+            t_q.ntt();
+            t_q
+        }
     }
 
+    #[inline(always)]
     fn multiply_ntts(&self, other: Self) -> Self {
         let mut h_hat = NttElement::default();
-    
+
         // Iterate over `K_MOD_ROOTS` with their indices
         for (i, &k_mod_root) in K_MOD_ROOTS.iter().enumerate() {
             (h_hat.0[2 * i], h_hat.0[2 * i + 1]) = NttElement::base_case_multiply(
                 self.0[2 * i],
-                self.0[2 * i + 1],
+                self.0[(2 * i) + 1],
                 other.0[2 * i],
-                other.0[2 * i + 1],
+                other.0[(2 * i) + 1],
                 k_mod_root,
             )
         }
-    
+
         h_hat
     }
 
     fn base_case_multiply(a_0: F, a_1: F, b_0: F, b_1: F, gamma: u16) -> (F, F) {
-        let c_0 = a_0 * b_0 + a_1 * b_1 * gamma;
-        let c_1 = a_0 * b_1 + a_1 * b_0;
+        let c_0 = (a_0 * b_0) + (a_1 * b_1) * gamma;
+        let c_1 = (a_0 * b_1) + (a_1 * b_0);
         (c_0, c_1)
     }
 
+    #[inline(always)]
     fn ntt(&mut self) {
         let mut k = 1;
         let mut len = 128;
@@ -100,7 +114,8 @@ impl NttElement {
         }
     }
 
-    fn ntt_inv(&mut self) {
+    #[inline(always)]
+    fn ntt_inv(&mut self) -> RingElement {
         let mut k = 127;
         let mut len = 2;
         while len <= 128 {
@@ -119,11 +134,15 @@ impl NttElement {
         for item in self.0.iter_mut() {
             *item = (*item * 3303).reduce_once();
         }
+        RingElement::new(self.0)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
+
     use super::*;
     #[test]
     fn test_sample_ntt() {
@@ -142,5 +161,45 @@ mod tests {
         byte_stream.ntt();
         byte_stream.ntt_inv();
         assert_eq!(byte_stream_copy.0, byte_stream.0)
+    }
+
+    #[test]
+    fn test_ntt_from_poly_cbd_inverse_with_random_input() {
+        // Generate a random byte stream using a seeded RNG for reproducibility
+        let bytes: Vec<u8> = (0..32)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
+        // Sample a ring element using the random byte stream
+        let mut ring_element = RingElement::sample_poly_cbd(&bytes, 0xFF);
+        let ring_element_copy = ring_element.clone();
+
+        // runs .ntt() on intstantiation
+        let mut ntt_element = NttElement::new(&mut ring_element);
+        ntt_element.ntt_inv();
+        assert_eq!(ring_element_copy.val, ntt_element.0);
+    }
+
+    #[test]
+    fn test_multiply_ntts_identities() {
+        let bytes: Vec<u8> = (0..32)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
+        let one = NttElement([F { val: 1 }; 256]);
+        let zero = NttElement([F { val: 0 }; 256]);
+
+        // Test multiplicative identity
+        let res = zero.multiply_ntts(one.clone());
+        assert_eq!(res.0, [F { val: 0 }; 256]);
+        let res = one.multiply_ntts(zero);
+        assert_eq!(res.0, [F { val: 0 }; 256]);
+
+        let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+        let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
+        let c = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xCC));
+
+        // Test associativity (ab)c = a(bc)
+        let ab_c = a.clone().multiply_ntts(b.clone()).multiply_ntts(c.clone());
+        let a_bc = a.multiply_ntts(b.multiply_ntts(c));
+        assert_eq!(ab_c.0, a_bc.0);
     }
 }

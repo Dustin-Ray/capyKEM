@@ -101,6 +101,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "rand",
+ "rand_chacha",
  "sha3",
 ]
 

@@ -2,6 +2,8 @@ pub mod ml_kem_constants {
     pub const Q: u16 = 3329;
     pub const N: u16 = 256;
     pub const ENCODE_SIZE_12: u16 = N * 12 / 8;
+    /// Parameterizes centered binomial distribution
+    pub const ETA: (u16, u16) = (2, 3);
 }
 
 /// Parameters for Barrett reduction

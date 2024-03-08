@@ -66,7 +66,7 @@ impl RingElement {
         Ok(f)
     }
 
-    fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
+    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
         prf.update(&[b]);
@@ -74,8 +74,6 @@ impl RingElement {
         let mut b = [0u8; (N / 2) as usize];
         let mut reader = prf.finalize_xof();
         reader.read(&mut b);
-
-        // dbg!(b.clone());
 
         let mut f = [FieldElement::new(0); N as usize];
         for i in 0..N {
@@ -95,10 +93,10 @@ impl RingElement {
             // The (i+1)-th coefficient is based on the second four bits
             if i % 2 == 0 {
                 f[i as usize] = FieldElement::new((bits[0] + bits[1]).into())
-                    - FieldElement::new((bits[2] + bits[3]).into());
+                    - FieldElement::new((bits[2] + bits[3]).into()).reduce_once();
             } else {
                 f[i as usize] = FieldElement::new((bits[4] + bits[5]).into())
-                    - FieldElement::new((bits[2] + bits[3]).into());
+                    - FieldElement::new((bits[2] + bits[3]).into()).reduce_once();
             }
         }
         // dbg!(f.clone());
