@@ -19,10 +19,15 @@ pub struct RingElement {
 
 impl RingElement {
     // Create a new RingElement from a vector of FieldElements
-    pub fn new(val: [FieldElement; 256]) -> Self {
+    pub fn from(val: [FieldElement; 256]) -> Self {
         RingElement { val }
     }
 
+    pub fn zero() -> Self {
+        [FieldElement::new(0); 256].into()
+    }
+
+    #[inline(always)]
     fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
@@ -38,6 +43,7 @@ impl RingElement {
         out
     }
 
+    #[inline(always)]
     fn byte_decode(b: &[u8]) -> Result<Vec<FieldElement>, &'static str> {
         if b.len() != ml_kem_constants::ENCODE_SIZE_12.into() {
             return Err("Invalid encoding length");
@@ -66,6 +72,7 @@ impl RingElement {
         Ok(f)
     }
 
+    #[inline(always)]
     pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
@@ -76,6 +83,7 @@ impl RingElement {
         reader.read(&mut b);
 
         let mut f = [FieldElement::new(0); N as usize];
+
         for i in 0..N {
             let b = b[(i / 2) as usize];
             let bits = [
@@ -100,7 +108,14 @@ impl RingElement {
             }
         }
         // dbg!(f.clone());
-        RingElement::new(f)
+        RingElement::from(f)
+    }
+}
+
+// Implementing From<[FieldElement; 256]> for RingElement
+impl From<[FieldElement; 256]> for RingElement {
+    fn from(val: [FieldElement; 256]) -> Self {
+        RingElement::from(val)
     }
 }
 
@@ -118,7 +133,7 @@ impl Add for RingElement {
         for (i, item) in self.val.iter().enumerate().take(256) {
             result[i] = *item + other.val[i];
         }
-        RingElement::new(result)
+        RingElement::from(result)
     }
 }
 
@@ -136,7 +151,7 @@ impl Sub for RingElement {
         for (i, item) in self.val.iter().enumerate().take(256) {
             result[i] = *item - other.val[i];
         }
-        RingElement::new(result)
+        RingElement::from(result)
     }
 }
 
@@ -151,42 +166,112 @@ impl PartialEq for RingElement {
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
+    use rand::{Rng, SeedableRng};
+    use rand_chacha::ChaCha20Rng;
 
     use super::*;
 
     #[test]
-    fn test_encode_decode() {
+    fn test_additive_commutativity() {
         // Initialize a RNG
-        let mut rng = thread_rng();
+        let bytes: Vec<u8> = (0..32)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
 
         // Step 1: Initialize a RingElement with random values
-        let mut original_values = [FieldElement { val: 0 }; 256];
-        for elem in original_values.iter_mut() {
-            // Generate a random value within the 12-bit range and assign it
-            elem.val = rng.gen_range(0..4096) % 3029;
+        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let b = RingElement::sample_poly_cbd(&bytes, 0xBB);
+
+        // Perform the addition in both orders
+        let a_plus_b = a + b;
+        let b_plus_a = b + a;
+
+        // Assert that a + b equals b + a
+        assert_eq!(a_plus_b, b_plus_a, "Addition should be commutative.");
+    }
+
+    #[test]
+    fn test_additive_closure() {
+        // Create two example RingElements
+        let a_vals = [FieldElement::new(123); 256];
+        let b_vals = [FieldElement::new(456); 256];
+
+        let a = RingElement::from(a_vals);
+        let b = RingElement::from(b_vals);
+
+        let result = a + b;
+
+        assert!(
+            result.val.iter().all(|&x| x.val < 3329),
+            "Summed elements are not reduced!"
+        );
+    }
+
+    #[test]
+    fn test_additive_identity() {
+        let bytes: Vec<u8> = (0..32)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
+
+        // Step 1: Initialize a RingElement with random values
+        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let zero = RingElement::zero();
+
+        // Adding the additive identity to a should result in a
+        let a_plus_zero = a.clone() + zero;
+        assert_eq!(
+            a, a_plus_zero,
+            "Adding the identity element should not change the element."
+        );
+
+        // Additionally, adding a to the additive identity should also result in a
+        let zero_plus_a = zero + a.clone();
+        assert_eq!(
+            a, zero_plus_a,
+            "Adding an element to the identity element should not change the element."
+        );
+    }
+
+    #[test]
+    fn test_additive_inverse() {
+        // Create an example RingElement a
+        let a_vals = [FieldElement::new(123); 256];
+        let a = RingElement::from(a_vals);
+        let mut inverse_vals = [FieldElement::default(); 256];
+        for (i, val) in a.val.iter().enumerate() {
+            inverse_vals[i] = -*val; // Negate each coefficient
         }
-        let original_ring_element = RingElement {
-            val: original_values,
-        };
+        let b = RingElement::from(inverse_vals);
+
+        // Perform the addition of a and its inverse
+        let result = a + b;
+
+        // The result should be the additive identity, i.e., all coefficients are 0
+        // Verify that result is the additive identity of the ring
+        let zero = RingElement::zero(); // The additive identity
+        assert_eq!(result, zero, "a + additive inverse of a should be zero.");
+    }
+    #[test]
+    fn test_encode_decode() {
+        // Initialize a RNG
+        let bytes: Vec<u8> = (0..32)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
+
+        // Step 1: Initialize a RingElement with random values
+        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
 
         // Step 2: Encode the RingElement to bytes
-        let encoded_bytes = original_ring_element.byte_encode();
+        let encoded_bytes = a.byte_encode();
 
         // Step 3: Decode the bytes back into a vector of FieldElement
         let decoded_elements = RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");
 
         // Step 4: Verify the decoded vector matches the original RingElement's array
-        assert_eq!(
-            decoded_elements.len(),
-            original_ring_element.val.len(),
-            "Length mismatch"
-        );
+        assert_eq!(decoded_elements.len(), a.val.len(), "Length mismatch");
 
-        for (decoded_elem, original_elem) in decoded_elements
-            .iter()
-            .zip(original_ring_element.val.iter())
-        {
+        // Step 5: Check each value for equality after encoding and decoding
+        for (decoded_elem, original_elem) in decoded_elements.iter().zip(a.val.iter()) {
             assert_eq!(decoded_elem.val, original_elem.val, "Value mismatch");
         }
     }
