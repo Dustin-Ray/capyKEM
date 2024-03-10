@@ -2,8 +2,49 @@ pub mod ml_kem_constants {
     pub const Q: u16 = 3329;
     pub const N: u16 = 256;
     pub const ENCODE_SIZE_12: u16 = N * 12 / 8;
-    /// Parameterizes centered binomial distribution
-    pub const ETA: (u16, u16) = (2, 3);
+}
+
+// appendix table 2
+pub mod parameter_sets {
+
+    // Requireed random bit generator strength
+    // 512 -> RBG(128)
+    // 768 -> RBG(192)
+    // 1024 -> RBG(256)
+
+    pub mod k {
+        pub const K_512: u16 = 2;
+        pub const K_768: u16 = 3;
+        pub const K_1024: u16 = 4;
+    }
+
+    pub mod eta_1 {
+        pub const ETA_ONE_512: u16 = 3;
+        pub const ETA_ONE_768: u16 = 2;
+        pub const ETA_ONE_1024: u16 = 2;
+    }
+
+    pub mod eta_two {
+        pub const ETA_TWO_512: u16 = 2;
+        pub const ETA_TWO_768: u16 = 2;
+        pub const ETA_TWO_1024: u16 = 2;
+    }
+
+    pub mod du {
+        pub const Du_512: u16 = 10;
+        pub const Du_768: u16 = 10;
+        pub const Du_1024: u16 = 11;
+    }
+
+    pub mod dv {
+        pub const Dv_512: u16 = 4;
+        pub const Dv_768: u16 = 4;
+        pub const Dv_1024: u16 = 5;
+    }
+
+    pub mod encoding_size {
+        pub const ENCODE_SIZE_12: u16 = 12;
+    }
 }
 
 /// Parameters for Barrett reduction
@@ -12,7 +53,7 @@ pub mod barrett_constants {
     pub const SHIFT: u16 = 24; // log₂(4¹²)
 }
 
-/// See utils.rs
+/// obtained externally and verified in utils.rs
 pub const K_NTT_ROOTS: [u16; 128] = [
     1, 1729, 2580, 3289, 2642, 630, 1897, 848, 1062, 1919, 193, 797, 2786, 3260, 569, 1746, 296,
     2447, 1339, 1476, 3046, 56, 2240, 1333, 1426, 2094, 535, 2882, 2393, 2879, 1974, 821, 289, 331,
@@ -24,7 +65,7 @@ pub const K_NTT_ROOTS: [u16; 128] = [
     1026, 1143, 2150, 2775, 886, 1722, 1212, 1874, 1029, 2110, 2935, 885, 2154,
 ];
 
-/// See utils.rs
+/// obtained externally and verified in utils.rs
 pub const K_INVERSE_NTT_ROOTS: [u16; 128] = [
     1, 1600, 40, 749, 2481, 1432, 2699, 687, 1583, 2760, 69, 543, 2532, 3136, 1410, 2267, 2508,
     1355, 450, 936, 447, 2794, 1235, 1903, 1996, 1089, 3273, 283, 1853, 1990, 882, 3033, 2419,
@@ -36,7 +77,7 @@ pub const K_INVERSE_NTT_ROOTS: [u16; 128] = [
     2573, 3096, 48, 667, 1920, 2229, 1041, 2606, 1692, 680, 2746, 568, 3312,
 ];
 
-/// See utils.rs
+/// obtained externally and verified in utils.rs
 pub const K_MOD_ROOTS: [u16; 128] = [
     17, 3312, 2761, 568, 583, 2746, 2649, 680, 1637, 1692, 723, 2606, 2288, 1041, 1100, 2229, 1409,
     1920, 2662, 667, 3281, 48, 233, 3096, 756, 2573, 2156, 1173, 3015, 314, 3050, 279, 1703, 1626,

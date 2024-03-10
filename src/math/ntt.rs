@@ -6,18 +6,18 @@ use sha3::{
     Shake256,
 };
 
-use std::ops::Mul;
+use std::ops::{AddAssign, Mul};
 #[derive(Clone, Copy)]
 pub struct NttElement([F; 256]);
 
 impl NttElement {
-    fn from(r: &mut RingElement) -> Self {
+    fn new(r: &mut RingElement) -> Self {
         let mut ntt_el = NttElement(r.val);
         ntt_el.ntt();
         ntt_el
     }
 
-    fn zero() -> Self {
+    pub fn zero() -> Self {
         NttElement([F::default(); 256])
     }
 
@@ -27,8 +27,11 @@ impl NttElement {
         one
     }
 
+    pub fn byte_encode_12() {}
+
     /// byte stream b should be rho||i||j
-    fn sample(byte_stream: Vec<u8>) -> Self {
+    /// per algorithm 12
+    pub fn sample(byte_stream: Vec<u8>) -> Self {
         // Get the XOF for the input
         let mut prf = Shake256::default();
         prf.update(&byte_stream);
@@ -57,15 +60,13 @@ impl NttElement {
             i += 3
         }
 
-        {
-            let mut t_q = NttElement(a_hat);
-            t_q.ntt();
-            t_q
-        }
+        // return t_hat
+        NttElement::new(&mut RingElement::new(a_hat))
+        
     }
 
     #[inline(always)]
-    fn multiply_ntts(&self, other: Self) -> Self {
+    pub fn multiply_ntts(&self, other: Self) -> Self {
         let mut h_hat = NttElement::zero();
 
         // Iterate over `K_MOD_ROOTS` with their indices
@@ -100,7 +101,7 @@ impl NttElement {
                 for j in start..start + len {
                     let t = zeta * self.0[j + len] % Q;
                     self.0[j + len] = self.0[j] - F::new(t).reduce_once();
-                    self.0[j] = self.0[j] + F::new(t).reduce_once();
+                    self.0[j] += F::new(t).reduce_once();
                 }
             }
             len /= 2;
@@ -127,7 +128,29 @@ impl NttElement {
         for item in self.0.iter_mut() {
             *item = (*item * 3303).reduce_once();
         }
-        RingElement::from(self.0)
+        RingElement::new(self.0)
+    }
+}
+
+impl AddAssign for NttElement {
+    fn add_assign(&mut self, other: Self) {
+        for (lhs, rhs) in self.0.iter_mut().zip(other.0.iter()) {
+            *lhs += *rhs;
+        }
+    }
+}
+
+// Implementing From<[FieldElement; 256]> for RingElement
+impl From<RingElement> for NttElement {
+    fn from(mut val: RingElement) -> Self {
+        NttElement::new(&mut val)
+    }
+}
+
+// Implementing From<[FieldElement; 256]> for RingElement
+impl From<&mut NttElement> for RingElement {
+    fn from(val: &mut NttElement) -> Self {
+        val.ntt_inv()
     }
 }
 
@@ -178,10 +201,11 @@ mod tests {
 
     #[test]
     fn test_ntt() {
+        // sample output is in NTT domain
         let mut byte_stream = NttElement::sample(vec![42_u8; 32]);
-        let byte_stream_copy = byte_stream;
-        byte_stream.ntt();
+        let mut byte_stream_copy = byte_stream;
         byte_stream.ntt_inv();
+        byte_stream_copy.ntt_inv();
         assert_eq!(byte_stream_copy.0, byte_stream.0)
     }
 
@@ -196,7 +220,7 @@ mod tests {
         let ring_element_copy = ring_element;
 
         // runs .ntt() on intstantiation
-        let mut ntt_element = NttElement::from(&mut ring_element);
+        let mut ntt_element = NttElement::new(&mut ring_element);
         ntt_element.ntt_inv();
         assert_eq!(ring_element_copy.val, ntt_element.0);
     }
@@ -207,9 +231,18 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = NttElement::from(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-        let b = NttElement::from(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
-        let c = NttElement::from(&mut RingElement::sample_poly_cbd(&bytes, 0xCC));
+        let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+        let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
+        let c = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xCC));
+
+        // Test associativity (ab)c = a(bc)
+        let ab_c = (a * b) * c;
+        let a_bc = a * (b * c);
+        assert_eq!(ab_c.0, a_bc.0);
+
+        let a = NttElement::sample(bytes.clone());
+        let b = NttElement::sample(bytes.clone());
+        let c = NttElement::sample(bytes.clone());
 
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
@@ -223,7 +256,7 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = NttElement::from(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+        let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
         let zero = NttElement::zero();
 
         // Test multiplicative identity
@@ -235,17 +268,19 @@ mod tests {
 
     #[test]
     fn test_closure_under_multiplication() {
-        let bytes: Vec<u8> = (0..32)
-            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
-            .collect();
+        for _ in 0..1000 {
+            let bytes: Vec<u8> = (0..32)
+                .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+                .collect();
 
-        let a = NttElement::from(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-        let b = NttElement::from(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
+            let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+            let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
 
-        let result = a * b;
-        assert!(
-            result.0.iter().all(|&x| x.val < 3329),
-            "Result of multiplication must be valid NttElement"
-        );
+            let result = a * b;
+            assert!(
+                result.0.iter().all(|&x| x.val < 3329),
+                "Result of multiplication must be valid NttElement"
+            );
+        }
     }
 }

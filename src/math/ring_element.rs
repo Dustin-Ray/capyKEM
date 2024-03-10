@@ -19,7 +19,7 @@ pub struct RingElement {
 
 impl RingElement {
     // Create a new RingElement from a vector of FieldElements
-    pub fn from(val: [FieldElement; 256]) -> Self {
+    pub fn new(val: [FieldElement; 256]) -> Self {
         RingElement { val }
     }
 
@@ -28,7 +28,7 @@ impl RingElement {
     }
 
     #[inline(always)]
-    fn byte_encode(self) -> Vec<u8> {
+    pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
         for i in (0..self.val.len()).step_by(2) {
@@ -107,15 +107,14 @@ impl RingElement {
                     - FieldElement::new((bits[2] + bits[3]).into()).reduce_once();
             }
         }
-        // dbg!(f.clone());
-        RingElement::from(f)
+        RingElement::new(f)
     }
 }
 
 // Implementing From<[FieldElement; 256]> for RingElement
 impl From<[FieldElement; 256]> for RingElement {
     fn from(val: [FieldElement; 256]) -> Self {
-        RingElement::from(val)
+        RingElement::new(val)
     }
 }
 
@@ -133,7 +132,7 @@ impl Add for RingElement {
         for (i, item) in self.val.iter().enumerate().take(256) {
             result[i] = *item + other.val[i];
         }
-        RingElement::from(result)
+        RingElement::new(result)
     }
 }
 
@@ -151,7 +150,7 @@ impl Sub for RingElement {
         for (i, item) in self.val.iter().enumerate().take(256) {
             result[i] = *item - other.val[i];
         }
-        RingElement::from(result)
+        RingElement::new(result)
     }
 }
 
@@ -173,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_additive_commutativity() {
-        // Initialize a RNG
+        // Initialize a CRNG
         let bytes: Vec<u8> = (0..32)
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
@@ -192,12 +191,12 @@ mod tests {
 
     #[test]
     fn test_additive_closure() {
-        // Create two example RingElements
-        let a_vals = [FieldElement::new(123); 256];
-        let b_vals = [FieldElement::new(456); 256];
+        let bytes: Vec<u8> = (0..32)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
 
-        let a = RingElement::from(a_vals);
-        let b = RingElement::from(b_vals);
+        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let b = RingElement::sample_poly_cbd(&bytes, 0xBB);
 
         let result = a + b;
 
@@ -236,12 +235,12 @@ mod tests {
     fn test_additive_inverse() {
         // Create an example RingElement a
         let a_vals = [FieldElement::new(123); 256];
-        let a = RingElement::from(a_vals);
+        let a = RingElement::new(a_vals);
         let mut inverse_vals = [FieldElement::default(); 256];
         for (i, val) in a.val.iter().enumerate() {
             inverse_vals[i] = -*val; // Negate each coefficient
         }
-        let b = RingElement::from(inverse_vals);
+        let b = RingElement::new(inverse_vals);
 
         // Perform the addition of a and its inverse
         let result = a + b;
@@ -253,24 +252,24 @@ mod tests {
     }
     #[test]
     fn test_encode_decode() {
-        // Initialize a RNG
+        // Initialize a CRNG
         let bytes: Vec<u8> = (0..32)
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        // Step 1: Initialize a RingElement with random values
+        // Initialize a RingElement with random values
         let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
 
-        // Step 2: Encode the RingElement to bytes
+        // Encode the RingElement to bytes
         let encoded_bytes = a.byte_encode();
 
-        // Step 3: Decode the bytes back into a vector of FieldElement
+        // Decode the bytes back into a vector of FieldElement
         let decoded_elements = RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");
 
-        // Step 4: Verify the decoded vector matches the original RingElement's array
+        // Verify the decoded vector matches the original RingElement's array
         assert_eq!(decoded_elements.len(), a.val.len(), "Length mismatch");
 
-        // Step 5: Check each value for equality after encoding and decoding
+        // Check each value for equality after encoding and decoding
         for (decoded_elem, original_elem) in decoded_elements.iter().zip(a.val.iter()) {
             assert_eq!(decoded_elem.val, original_elem.val, "Value mismatch");
         }

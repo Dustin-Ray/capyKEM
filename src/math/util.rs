@@ -1,5 +1,3 @@
-//! utility class used to generate system constants
-
 fn bitreverse(mut i: u16) -> u16 {
     let mut ret = 0;
     for _ in 0..7 {
@@ -34,7 +32,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_kntt_roots() {
+    fn create_and_test_kntt_roots() {
         let kntt_roots: Vec<u16> = (0..128)
             .map(|i| mod_pow(17, bitreverse(i).into(), Q.into()))
             .collect();
@@ -42,7 +40,7 @@ mod tests {
     }
 
     #[test]
-    fn test_k_inverse_ntt_roots() {
+    fn create_and_test_k_inverse_ntt_roots() {
         let k_inverse_ntt_roots: Vec<u16> = (0..128)
             .map(|i| {
                 let exp = (Q as u16) - 1 - bitreverse(i);
@@ -54,7 +52,7 @@ mod tests {
     }
 
     #[test]
-    fn test_k_mod_roots() {
+    fn create_and_test_k_mod_roots() {
         let k_mod_roots: Vec<u16> = (0..128)
             .map(|i| mod_pow(17, (2 * bitreverse(i) + 1).into(), Q.into()))
             .collect();

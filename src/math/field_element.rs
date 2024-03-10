@@ -3,7 +3,7 @@
 // use crypto_bigint::{rand_core::OsRng, NonZero, RandomMod};
 // use rand::Rng;
 
-use std::ops::{Add, Mul, Neg, Sub};
+use std::ops::{Add, AddAssign, Mul, Neg, Sub};
 
 use crate::constants::{
     barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
@@ -73,6 +73,12 @@ impl FieldElement {
     fn barrett_reduce(product: u32) -> Self {
         let quotient: u32 = ((product as u64 * bar_mul as u64) >> bar_shift) as u32;
         Self::new((product - quotient * Q as u32) as u16).reduce_once()
+    }
+}
+
+impl AddAssign for FieldElement {
+    fn add_assign(&mut self, other: Self) {
+        self.val = (self.val + other.val) % Q;
     }
 }
 
