@@ -3,7 +3,7 @@
 // use crypto_bigint::{rand_core::OsRng, NonZero, RandomMod};
 // use rand::Rng;
 
-use std::ops::{Add, AddAssign, Mul, Neg, Sub};
+use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 
 use crate::constants::{
     barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
@@ -17,12 +17,25 @@ pub enum OperationError {
 /// An integer modulo q
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct FieldElement {
-    pub val: u16,
+    val: u16,
 }
 
 impl FieldElement {
     pub fn new(val: u16) -> Self {
-        Self { val }
+        let mut f = FieldElement { val };
+        f.reduce_once();
+        f
+    }
+
+    pub fn zero() -> Self {
+        FieldElement::new(0)
+    }
+
+    // Change to modify `self` in place instead of consuming it
+    fn reduce_once(&mut self) {
+        let mut x = self.val.wrapping_sub(Q);
+        x = x.wrapping_add((x >> 15).wrapping_mul(Q));
+        self.val = x; // Apply the modification directly to `self`
     }
 
     pub fn default() -> Self {
@@ -35,6 +48,10 @@ impl FieldElement {
         } else {
             Ok(self)
         }
+    }
+
+    pub fn val(self) -> u16 {
+        self.val
     }
 
     /// FIPS 203 (DRAFT), Definition 4.5.
@@ -64,15 +81,9 @@ impl FieldElement {
         quotient as u16
     }
 
-    pub fn reduce_once(self) -> Self {
-        let mut x = self.val.wrapping_sub(Q);
-        x = x.wrapping_add((x >> 15).wrapping_mul(Q));
-        Self::new(x)
-    }
-
     fn barrett_reduce(product: u32) -> Self {
         let quotient: u32 = ((product as u64 * bar_mul as u64) >> bar_shift) as u32;
-        Self::new((product - quotient * Q as u32) as u16).reduce_once()
+        Self::new((product - quotient * Q as u32) as u16)
     }
 }
 
@@ -126,7 +137,7 @@ impl Add for FieldElement {
 
     // a + b % q
     fn add(self, other: Self) -> Self {
-        Self::new(self.val + other.val).reduce_once()
+        Self::new(self.val + other.val)
     }
 }
 
@@ -142,7 +153,7 @@ impl Sub for FieldElement {
         } else {
             self.val - other.val
         };
-        Self::new(result).reduce_once()
+        Self::new(result)
     }
 }
 
@@ -155,11 +166,10 @@ mod tests {
     fn exhaustive_test_reduce_once() {
         for i in Q + 1..=2 * Q {
             let element = FieldElement::new(i);
-            let reduced_element = element.reduce_once();
             assert!(
-                reduced_element.val <= Q,
+                element.val <= Q,
                 "Value should be reduced within [0, q] range for input: {i}, but got: {}",
-                reduced_element.val
+                element.val
             );
         }
     }
@@ -222,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_check_reduced_err() {
-        assert!(FieldElement::new(Q + 1).check_reduced().is_err());
+        assert!(FieldElement { val: Q + 1 }.check_reduced().is_err());
     }
 
     // Test that verifies compression into a range with d = 10, where q is assumed to be 3329.

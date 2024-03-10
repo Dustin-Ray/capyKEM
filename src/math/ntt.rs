@@ -6,25 +6,25 @@ use sha3::{
     Shake256,
 };
 
-use std::ops::{AddAssign, Mul};
+use core::ops::{AddAssign, Mul};
 #[derive(Clone, Copy)]
-pub struct NttElement([F; 256]);
+pub struct NttElement {
+    ring: [F; 256],
+}
 
 impl NttElement {
     fn new(r: &mut RingElement) -> Self {
-        let mut ntt_el = NttElement(r.val);
+        let mut ntt_el = NttElement {
+            ring: r.coefficients,
+        };
         ntt_el.ntt();
         ntt_el
     }
 
     pub fn zero() -> Self {
-        NttElement([F::default(); 256])
-    }
-
-    fn one() -> Self {
-        let mut one = NttElement([F::new(0); 256]);
-        one.0[0] = F::new(1);
-        one
+        NttElement {
+            ring: [F::default(); 256],
+        }
     }
 
     pub fn byte_encode_12() {}
@@ -36,6 +36,7 @@ impl NttElement {
         let mut prf = Shake256::default();
         prf.update(&byte_stream);
 
+        // why is this 486
         let mut b = [0_u8; 486];
         let mut reader = prf.finalize_xof();
         reader.read(&mut b);
@@ -50,11 +51,11 @@ impl NttElement {
             let d_2 = u16::from_le_bytes([b[i + 1], b[i + 2]]) >> 4; // Shift right to get the next 12 bits
 
             if d_1 < Q {
-                a_hat[j] = F::new(d_1).reduce_once();
+                a_hat[j] = F::new(d_1);
                 j += 1;
             }
             if d_2 < Q && j < 256 {
-                a_hat[j] = F::new(d_2).reduce_once();
+                a_hat[j] = F::new(d_2);
                 j += 1;
             }
             i += 3
@@ -62,7 +63,6 @@ impl NttElement {
 
         // return t_hat
         NttElement::new(&mut RingElement::new(a_hat))
-        
     }
 
     #[inline(always)]
@@ -71,11 +71,11 @@ impl NttElement {
 
         // Iterate over `K_MOD_ROOTS` with their indices
         for (i, &k_mod_root) in K_MOD_ROOTS.iter().enumerate() {
-            (h_hat.0[2 * i], h_hat.0[2 * i + 1]) = NttElement::base_case_multiply(
-                self.0[2 * i],
-                self.0[(2 * i) + 1],
-                other.0[2 * i],
-                other.0[(2 * i) + 1],
+            (h_hat.ring[2 * i], h_hat.ring[2 * i + 1]) = NttElement::base_case_multiply(
+                self.ring[2 * i],
+                self.ring[(2 * i) + 1],
+                other.ring[2 * i],
+                other.ring[(2 * i) + 1],
                 k_mod_root,
             )
         }
@@ -84,8 +84,8 @@ impl NttElement {
     }
 
     fn base_case_multiply(a_0: F, a_1: F, b_0: F, b_1: F, gamma: u16) -> (F, F) {
-        let c_0 = ((a_0 * b_0) + (a_1 * b_1) * gamma).reduce_once();
-        let c_1 = ((a_0 * b_1) + (a_1 * b_0)).reduce_once();
+        let c_0 = (a_0 * b_0) + (a_1 * b_1) * gamma;
+        let c_1 = (a_0 * b_1) + (a_1 * b_0);
         (c_0, c_1)
     }
 
@@ -99,9 +99,9 @@ impl NttElement {
                 k += 1;
 
                 for j in start..start + len {
-                    let t = zeta * self.0[j + len] % Q;
-                    self.0[j + len] = self.0[j] - F::new(t).reduce_once();
-                    self.0[j] += F::new(t).reduce_once();
+                    let t = zeta * self.ring[j + len] % Q;
+                    self.ring[j + len] = self.ring[j] - F::new(t);
+                    self.ring[j] += F::new(t);
                 }
             }
             len /= 2;
@@ -118,23 +118,23 @@ impl NttElement {
                 k -= 1;
 
                 for j in start..start + len {
-                    let t = self.0[j];
-                    self.0[j] = t + self.0[j + len].reduce_once();
-                    self.0[j + len] = F::new(zeta * (self.0[j + len] - t)).reduce_once();
+                    let t = self.ring[j];
+                    self.ring[j] = t + self.ring[j + len];
+                    self.ring[j + len] = F::new(zeta * (self.ring[j + len] - t));
                 }
             }
             len *= 2;
         }
-        for item in self.0.iter_mut() {
-            *item = (*item * 3303).reduce_once();
+        for item in self.ring.iter_mut() {
+            *item = *item * 3303;
         }
-        RingElement::new(self.0)
+        RingElement::new(self.ring)
     }
 }
 
 impl AddAssign for NttElement {
     fn add_assign(&mut self, other: Self) {
-        for (lhs, rhs) in self.0.iter_mut().zip(other.0.iter()) {
+        for (lhs, rhs) in self.ring.iter_mut().zip(other.ring.iter()) {
             *lhs += *rhs;
         }
     }
@@ -156,7 +156,7 @@ impl From<&mut NttElement> for RingElement {
 
 impl PartialEq for NttElement {
     fn eq(&self, other: &Self) -> bool {
-        self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
+        self.ring.iter().zip(other.ring.iter()).all(|(a, b)| a == b)
     }
 }
 
@@ -168,13 +168,12 @@ impl Mul<NttElement> for NttElement {
     }
 }
 
-// display in a grid-shape
 impl fmt::Debug for NttElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (index, element) in self.0.iter().enumerate() {
-            // adjust for space between columns
-            write!(f, "{:<8}", element.val)?;
-            // adust for row width
+        for (index, element) in self.ring.iter().enumerate() {
+            // Directly access the u16 value from element.val() without mutable access
+            write!(f, "{:<8}", element.val())?;
+            // Adjust for row width
             if (index + 1) % 16 == 0 {
                 writeln!(f)?;
             }
@@ -206,7 +205,7 @@ mod tests {
         let mut byte_stream_copy = byte_stream;
         byte_stream.ntt_inv();
         byte_stream_copy.ntt_inv();
-        assert_eq!(byte_stream_copy.0, byte_stream.0)
+        assert_eq!(byte_stream_copy.ring, byte_stream.ring)
     }
 
     #[test]
@@ -222,7 +221,7 @@ mod tests {
         // runs .ntt() on intstantiation
         let mut ntt_element = NttElement::new(&mut ring_element);
         ntt_element.ntt_inv();
-        assert_eq!(ring_element_copy.val, ntt_element.0);
+        assert_eq!(ring_element_copy.coefficients, ntt_element.ring);
     }
 
     #[test]
@@ -238,7 +237,7 @@ mod tests {
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
         let a_bc = a * (b * c);
-        assert_eq!(ab_c.0, a_bc.0);
+        assert_eq!(ab_c.ring, a_bc.ring);
 
         let a = NttElement::sample(bytes.clone());
         let b = NttElement::sample(bytes.clone());
@@ -247,7 +246,7 @@ mod tests {
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
         let a_bc = a * (b * c);
-        assert_eq!(ab_c.0, a_bc.0);
+        assert_eq!(ab_c.ring, a_bc.ring);
     }
 
     #[test]
@@ -261,9 +260,19 @@ mod tests {
 
         // Test multiplicative identity
         let res = zero * a;
-        assert_eq!(res, NttElement([F { val: 0 }; 256]));
+        assert_eq!(
+            res,
+            NttElement {
+                ring: [F::zero(); 256]
+            }
+        );
         let res = a * zero;
-        assert_eq!(res, NttElement([F { val: 0 }; 256]));
+        assert_eq!(
+            res,
+            NttElement {
+                ring: [F::zero(); 256]
+            }
+        );
     }
 
     #[test]
@@ -278,7 +287,7 @@ mod tests {
 
             let result = a * b;
             assert!(
-                result.0.iter().all(|&x| x.val < 3329),
+                result.ring.iter().all(|x| x.val() < 3329),
                 "Result of multiplication must be valid NttElement"
             );
         }

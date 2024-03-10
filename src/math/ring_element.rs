@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub};
+use core::ops::{Add, Sub};
 
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
@@ -7,33 +7,34 @@ use sha3::{
 
 use crate::{
     constants::ml_kem_constants::{self, N},
-    math::field_element::FieldElement,
+    math::field_element::FieldElement as F,
 };
 
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
-/// which themselves are [FieldElement].
+/// which themselves are [F].
 #[derive(Clone, Copy, Debug)]
 pub struct RingElement {
-    pub val: [FieldElement; 256],
+    pub coefficients: [F; 256],
 }
 
 impl RingElement {
     // Create a new RingElement from a vector of FieldElements
-    pub fn new(val: [FieldElement; 256]) -> Self {
-        RingElement { val }
+    pub fn new(val: [F; 256]) -> Self {
+        RingElement { coefficients: val }
     }
 
     pub fn zero() -> Self {
-        [FieldElement::new(0); 256].into()
+        [F::new(0); 256].into()
     }
 
     #[inline(always)]
     pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
-        for i in (0..self.val.len()).step_by(2) {
+        for i in (0..self.coefficients.len()).step_by(2) {
             // Combine two 12-bit integers into a single 24-bit integer
-            let x = u32::from(self.val[i].val) | (u32::from(self.val[i + 1].val) << 12);
+            let x = u32::from(self.coefficients[i].val())
+                | (u32::from(self.coefficients[i + 1].val()) << 12);
 
             // Split the 24-bit integer into 3 bytes and append to the output vector
             out.push((x & 0xFF) as u8); // First 8 bits
@@ -44,7 +45,7 @@ impl RingElement {
     }
 
     #[inline(always)]
-    fn byte_decode(b: &[u8]) -> Result<Vec<FieldElement>, &'static str> {
+    fn byte_decode(b: &[u8]) -> Result<Vec<F>, &'static str> {
         if b.len() != ml_kem_constants::ENCODE_SIZE_12.into() {
             return Err("Invalid encoding length");
         }
@@ -55,11 +56,11 @@ impl RingElement {
             let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
             const MASK_12: u32 = 0b1111_1111_1111;
 
-            let elem1 = FieldElement::new((d & MASK_12) as u16)
+            let elem1 = F::new((d & MASK_12) as u16)
                 .check_reduced()
                 .map_err(|_| "Invalid polynomial encoding")?;
 
-            let elem2 = FieldElement::new((d >> 12) as u16)
+            let elem2 = F::new((d >> 12) as u16)
                 .check_reduced()
                 .map_err(|_| "Invalid polynomial encoding")?;
 
@@ -82,7 +83,7 @@ impl RingElement {
         let mut reader = prf.finalize_xof();
         reader.read(&mut b);
 
-        let mut f = [FieldElement::new(0); N as usize];
+        let mut f = [F::new(0); N as usize];
 
         for i in 0..N {
             let b = b[(i / 2) as usize];
@@ -100,20 +101,20 @@ impl RingElement {
             // The i-th coefficient is based on the first four bits
             // The (i+1)-th coefficient is based on the second four bits
             if i % 2 == 0 {
-                f[i as usize] = FieldElement::new((bits[0] + bits[1]).into())
-                    - FieldElement::new((bits[2] + bits[3]).into()).reduce_once();
+                f[i as usize] =
+                    F::new((bits[0] + bits[1]).into()) - F::new((bits[2] + bits[3]).into());
             } else {
-                f[i as usize] = FieldElement::new((bits[4] + bits[5]).into())
-                    - FieldElement::new((bits[2] + bits[3]).into()).reduce_once();
+                f[i as usize] =
+                    F::new((bits[4] + bits[5]).into()) - F::new((bits[2] + bits[3]).into());
             }
         }
         RingElement::new(f)
     }
 }
 
-// Implementing From<[FieldElement; 256]> for RingElement
-impl From<[FieldElement; 256]> for RingElement {
-    fn from(val: [FieldElement; 256]) -> Self {
+// Implementing From<[F; 256]> for RingElement
+impl From<[F; 256]> for RingElement {
+    fn from(val: [F; 256]) -> Self {
         RingElement::new(val)
     }
 }
@@ -123,14 +124,14 @@ impl Add for RingElement {
 
     fn add(self, other: Self) -> Self::Output {
         assert_eq!(
-            self.val.len(),
-            other.val.len(),
+            self.coefficients.len(),
+            other.coefficients.len(),
             "RingElements must be of the same length"
         );
 
-        let mut result = [FieldElement::default(); 256]; // Assuming FieldElement has a default value
-        for (i, item) in self.val.iter().enumerate().take(256) {
-            result[i] = *item + other.val[i];
+        let mut result = [F::default(); 256]; // Assuming F has a default value
+        for (i, item) in self.coefficients.iter().enumerate().take(256) {
+            result[i] = *item + other.coefficients[i];
         }
         RingElement::new(result)
     }
@@ -141,14 +142,14 @@ impl Sub for RingElement {
 
     fn sub(self, other: Self) -> Self::Output {
         assert_eq!(
-            self.val.len(),
-            other.val.len(),
+            self.coefficients.len(),
+            other.coefficients.len(),
             "RingElements must be of the same length"
         );
 
-        let mut result = [FieldElement::default(); 256]; // Assuming FieldElement has a default value
-        for (i, item) in self.val.iter().enumerate().take(256) {
-            result[i] = *item - other.val[i];
+        let mut result = [F::default(); 256]; // Assuming F has a default value
+        for (i, item) in self.coefficients.iter().enumerate().take(256) {
+            result[i] = *item - other.coefficients[i];
         }
         RingElement::new(result)
     }
@@ -156,10 +157,13 @@ impl Sub for RingElement {
 
 impl PartialEq for RingElement {
     fn eq(&self, other: &Self) -> bool {
-        if self.val.len() != other.val.len() {
+        if self.coefficients.len() != other.coefficients.len() {
             return false;
         }
-        self.val.iter().zip(other.val.iter()).all(|(a, b)| a == b)
+        self.coefficients
+            .iter()
+            .zip(other.coefficients.iter())
+            .all(|(a, b)| a == b)
     }
 }
 
@@ -201,7 +205,7 @@ mod tests {
         let result = a + b;
 
         assert!(
-            result.val.iter().all(|&x| x.val < 3329),
+            result.coefficients.iter().all(|x| x.val() < 3329),
             "Summed elements are not reduced!"
         );
     }
@@ -234,10 +238,10 @@ mod tests {
     #[test]
     fn test_additive_inverse() {
         // Create an example RingElement a
-        let a_vals = [FieldElement::new(123); 256];
+        let a_vals = [F::new(123); 256];
         let a = RingElement::new(a_vals);
-        let mut inverse_vals = [FieldElement::default(); 256];
-        for (i, val) in a.val.iter().enumerate() {
+        let mut inverse_vals = [F::default(); 256];
+        for (i, val) in a.coefficients.iter().enumerate() {
             inverse_vals[i] = -*val; // Negate each coefficient
         }
         let b = RingElement::new(inverse_vals);
@@ -263,15 +267,19 @@ mod tests {
         // Encode the RingElement to bytes
         let encoded_bytes = a.byte_encode();
 
-        // Decode the bytes back into a vector of FieldElement
+        // Decode the bytes back into a vector of F
         let decoded_elements = RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");
 
         // Verify the decoded vector matches the original RingElement's array
-        assert_eq!(decoded_elements.len(), a.val.len(), "Length mismatch");
+        assert_eq!(
+            decoded_elements.len(),
+            a.coefficients.len(),
+            "Length mismatch"
+        );
 
         // Check each value for equality after encoding and decoding
-        for (decoded_elem, original_elem) in decoded_elements.iter().zip(a.val.iter()) {
-            assert_eq!(decoded_elem.val, original_elem.val, "Value mismatch");
+        for (decoded_elem, original_elem) in decoded_elements.iter().zip(a.coefficients.iter()) {
+            assert_eq!(decoded_elem.val(), original_elem.val(), "Value mismatch");
         }
     }
 }
