@@ -54,7 +54,9 @@ impl FieldElement {
         self.val
     }
 
-    /// FIPS 203 (DRAFT), Definition 4.5.
+    // FIPS 203 (DRAFT), Definition 4.5.
+    // REMARKS:
+    // parameterize du and dv
     pub fn compress(&self, d: u8) -> u16 {
         let dividend = (self.val as u64).wrapping_shl(d.into());
         let quotient = dividend

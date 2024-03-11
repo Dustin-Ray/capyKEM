@@ -1,3 +1,4 @@
+use core::ops::AddAssign;
 use core::ops::{Add, Sub};
 
 use sha3::{
@@ -27,6 +28,8 @@ impl RingElement {
         [F::new(0); 256].into()
     }
 
+    // REMARKS:
+    // TODO: parameterize du and dv
     pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
@@ -43,7 +46,7 @@ impl RingElement {
         out
     }
 
-    fn byte_decode(b: &[u8]) -> Result<Vec<F>, &'static str> {
+    pub fn byte_decode(b: &[u8]) -> Result<Self, &'static str> {
         if b.len() != ml_kem_constants::ENCODE_SIZE_12.into() {
             return Err("Invalid encoding length");
         }
@@ -67,10 +70,15 @@ impl RingElement {
 
             i += 3;
         }
+        let array: [F; 256] = f
+            .try_into()
+            .map_err(|_| "Conversion to fixed-size array failed")?;
 
-        Ok(f)
+        Ok(RingElement::new(array))
     }
 
+    // REMARKS:
+    // TODO: parameterize eta1 and eta 2
     pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
@@ -109,10 +117,23 @@ impl RingElement {
     }
 }
 
-// Implementing From<[F; 256]> for RingElement
 impl From<[F; 256]> for RingElement {
     fn from(val: [F; 256]) -> Self {
         RingElement::new(val)
+    }
+}
+
+impl From<&[u8]> for RingElement {
+    fn from(slice: &[u8]) -> Self {
+        RingElement::byte_decode(slice).expect("failed to decode bytes, check reduction?")
+    }
+}
+
+impl AddAssign for RingElement {
+    fn add_assign(&mut self, other: Self) {
+        for (lhs, rhs) in self.coefficients.iter_mut().zip(other.coefficients.iter()) {
+            *lhs += *rhs;
+        }
     }
 }
 
@@ -277,13 +298,17 @@ mod tests {
 
         // Verify the decoded vector matches the original RingElement's array
         assert_eq!(
-            decoded_elements.len(),
+            decoded_elements.coefficients.len(),
             a.coefficients.len(),
             "Length mismatch"
         );
 
         // Check each value for equality after encoding and decoding
-        for (decoded_elem, original_elem) in decoded_elements.iter().zip(a.coefficients.iter()) {
+        for (decoded_elem, original_elem) in decoded_elements
+            .coefficients
+            .iter()
+            .zip(a.coefficients.iter())
+        {
             assert_eq!(decoded_elem.val(), original_elem.val(), "Value mismatch");
         }
     }

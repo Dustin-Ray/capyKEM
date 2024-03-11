@@ -11,8 +11,7 @@ use crate::{
 };
 
 // NOTES:
-// determine difference between PRF and XOF here
-
+// TODO: determine difference between PRF and XOF here
 impl Message {
     fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
         let mut xof = Shake256::default();
@@ -70,7 +69,7 @@ impl Message {
             .iter_mut()
             .take(k)
             .flat_map(|t_elem| {
-                let mut bytes = Into::<RingElement>::into(t_elem).byte_encode();
+                let mut bytes = Into::<RingElement>::into(*t_elem).byte_encode();
                 bytes.extend_from_slice(rho);
                 bytes
             })
@@ -80,9 +79,30 @@ impl Message {
         let dk_pke: Vec<u8> = s
             .iter_mut()
             .take(k)
-            .flat_map(|s_elem| Into::<RingElement>::into(s_elem).byte_encode())
+            .flat_map(|s_elem| Into::<RingElement>::into(*s_elem).byte_encode())
             .collect();
 
         (ek_pke, dk_pke)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Message;
+
+    #[test]
+    fn test_keygen() {
+        let m = Message {
+            m: vec![],
+            k: 3,
+            du: 10,
+            dv: 4,
+            eta_1: 2,
+            eta_2: 2,
+        };
+        let (ek, dk) = m.k_pke_keygen();
+
+        println!("{:?}", ek);
+        println!("{:?}", dk);
     }
 }

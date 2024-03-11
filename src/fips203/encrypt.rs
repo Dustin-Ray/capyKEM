@@ -1,0 +1,65 @@
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake256,
+};
+
+use crate::{
+    math::{ntt::NttElement, ring_element::RingElement},
+    Message,
+};
+
+impl Message {
+    fn k_pke_encrypt(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
+        let k = self.k as usize;
+        let mut n = 0;
+        let t_hat = RingElement::from(&ek_pke[0..384 * k]);
+        let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
+
+        // Generate the matrix a_hat
+        let mut a_hat = vec![NttElement::zero(); k * k];
+        for i in 0..k {
+            for j in 0..k {
+                let mut rho_i_j = Vec::with_capacity(rho.len() + 2);
+                rho_i_j.extend(rho);
+                rho_i_j.push(i as u8);
+                rho_i_j.push(j as u8);
+                a_hat[i * k + j] = NttElement::sample(rho_i_j);
+            }
+        }
+
+        // generate r, run ntt k times
+        let mut r_hat = vec![NttElement::zero(); k];
+        for r_elem in r_hat.iter_mut().take(k) {
+            *r_elem = RingElement::sample_poly_cbd(r, n).into();
+            n += 1;
+        }
+
+        // generate e1
+        let mut e_1 = vec![RingElement::zero(); k];
+        for e_elem in e_1.iter_mut().take(k) {
+            *e_elem = RingElement::sample_poly_cbd(r, n);
+            n += 1;
+        }
+
+        // generate e2
+        let e2 = RingElement::sample_poly_cbd(r, n);
+
+        // generate A transpose
+        // TODO: this is likely not correct
+        let mut t = vec![RingElement::zero(); k];
+        for i in 0..t.len() {
+            t[i] = e_1[i];
+            for j in 0..r.len() {
+                // Is addition happening in NTT domain as well?
+                t[i] += (a_hat[i * k + j] * r_hat[j]).into() // into ring = NTT^(-1)
+            }
+        }
+
+        // let mu = RingElement::byte_decode(&self.m).d;
+        // TODO: NEED compress and decompress for ring
+
+        todo!()
+    }
+}

@@ -7,7 +7,7 @@ mod fips203;
 mod math;
 
 pub struct Message {
-    pub data: Vec<u8>,
+    pub m: Vec<u8>,
     pub k: u16,
     pub du: u16,
     pub dv: u16,

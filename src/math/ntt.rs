@@ -27,17 +27,22 @@ impl NttElement {
         }
     }
 
-    pub fn byte_encode_12() {}
+    pub fn get_ring(&self) -> [F; 256] {
+        self.ring
+    }
 
     /// byte stream b should be rho||i||j
     /// per algorithm 12
+    /// TODO: it is possible this algorithm will need to be
+    /// parameterized with i and j to correctly compute
+    /// a transpose if needed
     pub fn sample(byte_stream: Vec<u8>) -> Self {
         // Get the XOF for the input
         let mut prf = Shake256::default();
         prf.update(&byte_stream);
 
-        // why is this 486
-        let mut b = [0_u8; 486];
+        // what size should this be, if sized at all?
+        let mut b = [0_u8; 512];
         let mut reader = prf.finalize_xof();
         reader.read(&mut b);
 
@@ -65,7 +70,6 @@ impl NttElement {
         NttElement::new(&mut RingElement::new(a_hat))
     }
 
-    #[inline(always)]
     fn multiply_ntts(&self, other: Self) -> Self {
         let mut h_hat = NttElement::zero();
 
@@ -89,7 +93,7 @@ impl NttElement {
         (c_0, c_1)
     }
 
-    #[inline(always)]
+    // This should only be used when converting to Tq
     fn ntt(&mut self) {
         let mut k = 1;
         let mut len = 128;
@@ -108,7 +112,7 @@ impl NttElement {
         }
     }
 
-    #[inline(always)]
+    // This should only be used when converting to Rq
     fn ntt_inv(&mut self) -> RingElement {
         let mut k = 127;
         let mut len = 2;
@@ -140,16 +144,14 @@ impl AddAssign for NttElement {
     }
 }
 
-// Implementing From<[FieldElement; 256]> for RingElement
 impl From<RingElement> for NttElement {
     fn from(mut val: RingElement) -> Self {
         NttElement::new(&mut val)
     }
 }
 
-// Implementing From<[FieldElement; 256]> for RingElement
-impl From<&mut NttElement> for RingElement {
-    fn from(val: &mut NttElement) -> Self {
+impl From<NttElement> for RingElement {
+    fn from(mut val: NttElement) -> Self {
         val.ntt_inv()
     }
 }
@@ -227,9 +229,11 @@ mod tests {
         let ring_element_copy = ring_element;
 
         // runs .ntt() on intstantiation
-        let mut ntt_element = NttElement::new(&mut ring_element);
-        ntt_element.ntt_inv();
-        assert_eq!(ring_element_copy.coefficients, ntt_element.ring);
+        let ntt_element = NttElement::new(&mut ring_element);
+        assert_eq!(
+            ring_element_copy.coefficients,
+            Into::<RingElement>::into(ntt_element).coefficients
+        );
     }
 
     #[test]
