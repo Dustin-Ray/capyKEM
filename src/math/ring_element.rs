@@ -27,7 +27,6 @@ impl RingElement {
         [F::new(0); 256].into()
     }
 
-    #[inline(always)]
     pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
@@ -44,7 +43,6 @@ impl RingElement {
         out
     }
 
-    #[inline(always)]
     fn byte_decode(b: &[u8]) -> Result<Vec<F>, &'static str> {
         if b.len() != ml_kem_constants::ENCODE_SIZE_12.into() {
             return Err("Invalid encoding length");
@@ -73,7 +71,6 @@ impl RingElement {
         Ok(f)
     }
 
-    #[inline(always)]
     pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
@@ -173,6 +170,14 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
+
+    // REMARKS:
+    // axiom tests:
+    // -[x] closure under addition
+    // -[x] commutative
+    // -[x] identity
+    // -[ ] associativity
+    // -[ ] distributivity
 
     #[test]
     fn test_additive_commutativity() {

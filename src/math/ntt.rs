@@ -66,7 +66,7 @@ impl NttElement {
     }
 
     #[inline(always)]
-    pub fn multiply_ntts(&self, other: Self) -> Self {
+    fn multiply_ntts(&self, other: Self) -> Self {
         let mut h_hat = NttElement::zero();
 
         // Iterate over `K_MOD_ROOTS` with their indices
@@ -171,7 +171,6 @@ impl Mul<NttElement> for NttElement {
 impl fmt::Debug for NttElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.ring.iter().enumerate() {
-            // Directly access the u16 value from element.val() without mutable access
             write!(f, "{:<8}", element.val())?;
             // Adjust for row width
             if (index + 1) % 16 == 0 {
@@ -188,6 +187,15 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
 
     use super::*;
+
+    // REMARKS:
+    // axiom tests:
+    // -[ ] commutative
+    // -[x] zero identity
+    // -[x] associativity
+    // -[ ] distributivity
+    // -[x] multiplication closure
+
     #[test]
     fn test_sample_ntt() {
         let byte_stream: Vec<u8> = vec![42_u8; 32];

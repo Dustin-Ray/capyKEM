@@ -10,6 +10,9 @@ use crate::{
     Message,
 };
 
+// NOTES:
+// determine difference between PRF and XOF here
+
 impl Message {
     fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
         let mut xof = Shake256::default();
@@ -31,9 +34,9 @@ impl Message {
         for i in 0..k {
             for j in 0..k {
                 let mut rho_i_j = Vec::with_capacity(rho.len() + 2);
-                rho_i_j.extend(rho); // Extend `append` with `rho`, avoiding cloning.
-                rho_i_j.push(i as u8); // Append `i` (ensure it's within u8 range).
-                rho_i_j.push(j as u8); // Append `j` (ensure it's within u8 range).
+                rho_i_j.extend(rho);
+                rho_i_j.push(i as u8);
+                rho_i_j.push(j as u8);
                 a_hat[i * k + j] = NttElement::sample(rho_i_j);
             }
         }
@@ -58,7 +61,7 @@ impl Message {
             t[i] = e[i];
             for j in 0..s.len() {
                 // Is addition happening in NTT domain as well?
-                t[i] += a_hat[i * k + j] * s[j]
+                t[i] += a_hat[i * k + j] * s[j] // This accounts for FIPS 203 revision and will likely change
             }
         }
 
@@ -67,7 +70,7 @@ impl Message {
             .iter_mut()
             .take(k)
             .flat_map(|t_elem| {
-                let mut bytes = <&mut NttElement as Into<RingElement>>::into(t_elem).byte_encode();
+                let mut bytes = Into::<RingElement>::into(t_elem).byte_encode();
                 bytes.extend_from_slice(rho);
                 bytes
             })
@@ -77,7 +80,7 @@ impl Message {
         let dk_pke: Vec<u8> = s
             .iter_mut()
             .take(k)
-            .flat_map(|s_elem| <&mut NttElement as Into<RingElement>>::into(s_elem).byte_encode())
+            .flat_map(|s_elem| Into::<RingElement>::into(s_elem).byte_encode())
             .collect();
 
         (ek_pke, dk_pke)
