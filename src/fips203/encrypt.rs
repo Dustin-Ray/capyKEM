@@ -21,19 +21,8 @@ impl Message {
         let mut a_hat = vec![NttElement::zero(); k * k];
         for i in 0..k {
             for j in 0..k {
-                let mut rho_i_j = Vec::with_capacity(rho.len() + 2);
-                rho_i_j.extend(rho);
-                rho_i_j.push(i as u8);
-                rho_i_j.push(j as u8);
-                a_hat[i * k + j] = NttElement::sample(rho_i_j);
+                a_hat[i * k + j] = NttElement::sample_ntt(rho, i, j);
             }
-        }
-
-        // generate r, run ntt k times
-        let mut r_hat = vec![NttElement::zero(); k];
-        for r_elem in r_hat.iter_mut().take(k) {
-            *r_elem = RingElement::sample_poly_cbd(r, n).into();
-            n += 1;
         }
 
         // generate e1
@@ -46,14 +35,21 @@ impl Message {
         // generate e2
         let e2 = RingElement::sample_poly_cbd(r, n);
 
+        // generate r, run ntt k times
+        let mut r_hat = vec![NttElement::zero(); k];
+        for r_elem in r_hat.iter_mut().take(k) {
+            *r_elem = RingElement::sample_poly_cbd(r, n).into();
+            n += 1;
+        }
+
         // generate A transpose
         // TODO: this is likely not correct
-        let mut t = vec![RingElement::zero(); k];
-        for i in 0..t.len() {
-            t[i] = e_1[i];
+        let mut u = vec![RingElement::zero(); k];
+        for i in 0..u.len() {
+            u[i] = e_1[i];
             for j in 0..r.len() {
                 // Is addition happening in NTT domain as well?
-                t[i] += (a_hat[i * k + j] * r_hat[j]).into() // into ring = NTT^(-1)
+                u[i] += (a_hat[i * k + j] * r_hat[j]).into() // into ring = NTT^(-1)
             }
         }
 

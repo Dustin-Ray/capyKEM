@@ -1,12 +1,14 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
-use crate::constants::{ml_kem_constants::Q, K_MOD_ROOTS, K_NTT_ROOTS};
+use crate::constants::{
+    ml_kem_constants::{N, Q},
+    K_MOD_ROOTS, K_NTT_ROOTS,
+};
 use core::fmt;
+use core::ops::{AddAssign, Mul};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
-    Shake256,
+    Shake128, Shake256,
 };
-
-use core::ops::{AddAssign, Mul};
 #[derive(Clone, Copy)]
 pub struct NttElement {
     ring: [F; 256],
@@ -31,43 +33,44 @@ impl NttElement {
         self.ring
     }
 
-    /// byte stream b should be rho||i||j
-    /// per algorithm 12
-    /// TODO: it is possible this algorithm will need to be
-    /// parameterized with i and j to correctly compute
-    /// a transpose if needed
-    pub fn sample(byte_stream: Vec<u8>) -> Self {
-        // Get the XOF for the input
-        let mut prf = Shake256::default();
-        prf.update(&byte_stream);
+    pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement {
+        let mut hasher = Shake128::default();
+        hasher.update(rho);
+        hasher.update(&[ii.try_into().unwrap(), jj.try_into().unwrap()]);
 
-        // what size should this be, if sized at all?
-        let mut b = [0_u8; 512];
-        let mut reader = prf.finalize_xof();
-        reader.read(&mut b);
+        let mut reader = hasher.finalize_xof();
 
-        let mut i = 0;
-        let mut j = 0;
-        let mut a_hat: [F; 256] = [F::default(); 256];
+        let mut a = NttElement::zero();
+        let mut j = 0usize;
+        let mut buf = [0u8; 24];
+        let mut off = 24usize;
+        println!("{:?}", buf);
+        while j < N.into() {
+            if off >= 24 {
+                reader.read(&mut buf);
+                println!("{:?}", buf);
+                off = 0;
+            }
 
-        // Populate the matrix â
-        while j < 256 {
-            let d_1 = u16::from_le_bytes([b[i], b[i + 1]]) & 0b1111_1111_1111; // Masking to get 12 bits
-            let d_2 = u16::from_le_bytes([b[i + 1], b[i + 2]]) >> 4; // Shift right to get the next 12 bits
+            let d1 = u16::from_le_bytes([buf[off], buf[off + 1]]) & 0x0FFF;
+            let d2 = ((u16::from(buf[off + 1]) | (u16::from(buf[off + 2]) << 8)) >> 4) & 0x0FFF;
 
-            if d_1 < Q {
-                a_hat[j] = F::new(d_1);
+            off += 3;
+
+            if d1 < Q {
+                a.ring[j] = F::new(d1);
                 j += 1;
             }
-            if d_2 < Q && j < 256 {
-                a_hat[j] = F::new(d_2);
+            if j >= N.into() {
+                break;
+            }
+
+            if d2 < Q {
+                a.ring[j] = F::new(d2);
                 j += 1;
             }
-            i += 3
         }
-
-        // return t_hat
-        NttElement::new(&mut RingElement::new(a_hat))
+        a
     }
 
     fn multiply_ntts(&self, other: Self) -> Self {
@@ -200,18 +203,39 @@ mod tests {
 
     #[test]
     fn test_sample_ntt() {
-        let byte_stream: Vec<u8> = vec![42_u8; 32];
-        let ntt_element = NttElement::sample(byte_stream);
-        println!(
-            "NTT element sampled from byte stream seed: \n\n{:?}",
-            ntt_element
-        );
+        let byte_stream = [0_u8; 0];
+
+        let a = NttElement::sample_ntt(&byte_stream, 0, 1);
+
+        // testing against the great Filippo Valsorda https://github.com/FiloSottile/mlkem768
+        let result: [F; 256] = [
+            2278, 18, 2449, 1376, 2453, 1346, 66, 738, 2100, 1008, 950, 2669, 2121, 3030, 880,
+            2569, 3146, 1432, 1285, 2106, 1943, 895, 2326, 3255, 1301, 1752, 1281, 2500, 3149,
+            1061, 959, 687, 199, 1817, 1651, 2069, 3091, 2864, 120, 2222, 3005, 1823, 2721, 3012,
+            665, 1426, 386, 1639, 1632, 591, 1405, 756, 464, 1405, 2701, 3275, 76, 2137, 664, 2457,
+            2216, 2352, 1994, 1521, 1944, 1753, 999, 2051, 3219, 2771, 1596, 2123, 527, 339, 2532,
+            2079, 2994, 576, 1876, 2698, 1708, 119, 537, 2122, 3132, 285, 3198, 3131, 2761, 3187,
+            1, 3082, 2809, 3140, 895, 356, 1653, 2663, 2856, 2290, 3166, 1245, 1876, 2355, 2746,
+            3213, 619, 551, 3216, 2092, 966, 479, 3079, 2557, 2706, 380, 2388, 915, 4, 2336, 144,
+            3220, 1807, 95, 1109, 2105, 1441, 2379, 2890, 2985, 2129, 1040, 1472, 1350, 1976, 927,
+            862, 1556, 2188, 447, 856, 1458, 2372, 1254, 2132, 2618, 200, 2880, 2834, 1811, 505,
+            124, 621, 2574, 2546, 2974, 1875, 1646, 618, 1867, 1394, 1059, 486, 1232, 2574, 563,
+            2509, 2805, 2674, 1594, 782, 1147, 12, 1853, 459, 2718, 1861, 913, 2538, 1986, 346,
+            2139, 1256, 3148, 830, 615, 676, 2220, 2638, 893, 977, 474, 1096, 1307, 3285, 462,
+            3082, 2805, 1286, 2645, 2733, 2695, 2082, 3216, 414, 1376, 2636, 971, 2671, 1721, 746,
+            516, 1620, 688, 1903, 2497, 2869, 1587, 819, 256, 2326, 943, 1733, 117, 2941, 2933,
+            1852, 2753, 2057, 2585, 1042, 2572, 220, 3049, 558, 2617, 1975, 45, 2593, 757, 3202,
+            1164, 1123, 1458, 1720, 2365, 148, 605, 2229, 760, 90, 3212, 3015, 1643, 1962, 2954,
+        ]
+        .map(|val| F::new(val));
+
+        assert_eq!(a.ring, result);
     }
 
     #[test]
     fn test_ntt() {
         // sample output is in NTT domain
-        let mut byte_stream = NttElement::sample(vec![42_u8; 32]);
+        let mut byte_stream = NttElement::sample_ntt(&vec![42_u8; 32], 1, 1);
         let mut byte_stream_copy = byte_stream;
         byte_stream.ntt_inv();
         byte_stream_copy.ntt_inv();
@@ -251,9 +275,9 @@ mod tests {
         let a_bc = a * (b * c);
         assert_eq!(ab_c.ring, a_bc.ring);
 
-        let a = NttElement::sample(bytes.clone());
-        let b = NttElement::sample(bytes.clone());
-        let c = NttElement::sample(bytes.clone());
+        let a = NttElement::sample_ntt(&bytes.clone(), 0, 0);
+        let b = NttElement::sample_ntt(&bytes.clone(), 0, 0);
+        let c = NttElement::sample_ntt(&bytes.clone(), 0, 0);
 
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;

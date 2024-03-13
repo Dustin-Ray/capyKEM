@@ -14,7 +14,7 @@ use crate::{
 // TODO: determine difference between PRF and XOF here
 impl Message {
     fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
-        let mut xof = Shake256::default();
+        let mut xof = Shake256::default(); // I think this should be 512 -> 256 bits of security
         let bytes: Vec<u8> = (0..32).map(|_| ChaCha20Rng::from_entropy().gen()).collect();
 
         xof.update(&bytes);
@@ -32,11 +32,7 @@ impl Message {
         let mut a_hat = vec![NttElement::zero(); k * k];
         for i in 0..k {
             for j in 0..k {
-                let mut rho_i_j = Vec::with_capacity(rho.len() + 2);
-                rho_i_j.extend(rho);
-                rho_i_j.push(i as u8);
-                rho_i_j.push(j as u8);
-                a_hat[i * k + j] = NttElement::sample(rho_i_j);
+                a_hat[i * k + j] = NttElement::sample_ntt(rho, i, j);
             }
         }
 
@@ -75,7 +71,6 @@ impl Message {
             })
             .collect();
 
-        // ByteEncode12(s_hat||rho)
         let dk_pke: Vec<u8> = s
             .iter_mut()
             .take(k)
@@ -102,7 +97,8 @@ mod tests {
         };
         let (ek, dk) = m.k_pke_keygen();
 
-        println!("{:?}", ek);
-        println!("{:?}", dk);
+        // Convert to hexadecimal string and print
+        println!("Encryption Key: {}", hex::encode(&ek));
+        println!("Decryption Key: {}", hex::encode(&dk));
     }
 }

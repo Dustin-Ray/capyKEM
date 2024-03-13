@@ -1,3 +1,4 @@
+use core::fmt;
 use core::ops::AddAssign;
 use core::ops::{Add, Sub};
 
@@ -13,7 +14,7 @@ use crate::{
 
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [F].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct RingElement {
     pub coefficients: [F; 256],
 }
@@ -90,30 +91,38 @@ impl RingElement {
 
         let mut f = [F::new(0); N as usize];
 
-        for i in 0..N {
+        for i in (0..N).step_by(2) {
+            // Iterate through indices, stepping by 2.
             let b = b[(i / 2) as usize];
-            let bits = [
-                (b >> 7) & 1,
-                (b >> 6) & 1,
-                (b >> 5) & 1,
-                (b >> 4) & 1,
-                (b >> 3) & 1,
-                (b >> 2) & 1,
-                (b >> 1) & 1,
-                b & 1,
-            ];
+            let b_7 = (b >> 7) & 1;
+            let b_6 = (b >> 6) & 1;
+            let b_5 = (b >> 5) & 1;
+            let b_4 = (b >> 4) & 1;
+            let b_3 = (b >> 3) & 1;
+            let b_2 = (b >> 2) & 1;
+            let b_1 = (b >> 1) & 1;
+            let b_0 = b & 1;
 
-            // The i-th coefficient is based on the first four bits
-            // The (i+1)-th coefficient is based on the second four bits
-            if i % 2 == 0 {
-                f[i as usize] =
-                    F::new((bits[0] + bits[1]).into()) - F::new((bits[2] + bits[3]).into());
-            } else {
-                f[i as usize] =
-                    F::new((bits[4] + bits[5]).into()) - F::new((bits[2] + bits[3]).into());
+            f[i as usize] = F::new((b_0 + b_1).into()) - F::new((b_2 + b_3).into());
+            // Ensure i+1 doesn't go out of bounds, relevant if N is odd.
+            if i + 1 < N {
+                f[(i + 1) as usize] = F::new((b_4 + b_5).into()) - F::new((b_6 + b_7).into());
             }
         }
         RingElement::new(f)
+    }
+}
+
+impl fmt::Debug for RingElement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (index, element) in self.coefficients.iter().enumerate() {
+            write!(f, "{:<8}", element.val())?;
+            // Adjust for row width
+            if (index + 1) % 16 == 0 {
+                writeln!(f)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -147,7 +156,7 @@ impl Add for RingElement {
             "RingElements must be of the same length"
         );
 
-        let mut result = [F::default(); 256]; // Assuming F has a default value
+        let mut result = [F::default(); 256];
         for (i, item) in self.coefficients.iter().enumerate().take(256) {
             result[i] = *item + other.coefficients[i];
         }
@@ -165,7 +174,7 @@ impl Sub for RingElement {
             "RingElements must be of the same length"
         );
 
-        let mut result = [F::default(); 256]; // Assuming F has a default value
+        let mut result = [F::default(); 256];
         for (i, item) in self.coefficients.iter().enumerate().take(256) {
             result[i] = *item - other.coefficients[i];
         }
@@ -199,6 +208,33 @@ mod tests {
     // -[x] identity
     // -[ ] associativity
     // -[ ] distributivity
+
+    #[test]
+    fn test_sample_poly_cbd() {
+        let bytes = "example input bytes".as_bytes();
+
+        let a = RingElement::sample_poly_cbd(&bytes, 0x01);
+
+        // testing against the great Filippo Valsorda https://github.com/FiloSottile/mlkem768
+        let result = [
+            3328, 3328, 3327, 3328, 3328, 2, 0, 3328, 3328, 0, 0, 0, 0, 3328, 2, 1, 0, 0, 3328, 1,
+            0, 3328, 1, 3328, 3328, 0, 0, 0, 1, 3328, 1, 3328, 1, 0, 2, 0, 1, 0, 3328, 0, 2, 3328,
+            3328, 2, 1, 3328, 1, 0, 0, 0, 3327, 0, 1, 2, 3328, 1, 0, 0, 3328, 0, 0, 0, 0, 1, 1, 1,
+            1, 3328, 2, 3328, 3327, 3328, 0, 1, 0, 0, 0, 3328, 1, 3328, 0, 0, 0, 1, 1, 0, 3328, 0,
+            1, 1, 0, 3328, 3328, 3328, 1, 1, 0, 0, 3328, 0, 3327, 0, 2, 1, 0, 3328, 1, 0, 3328,
+            3328, 3328, 3328, 0, 1, 0, 0, 1, 2, 1, 0, 1, 0, 3328, 3328, 0, 2, 3328, 3328, 3328, 0,
+            3328, 3328, 3328, 1, 3328, 1, 3328, 1, 0, 3328, 1, 3328, 2, 3327, 3328, 0, 3328, 2, 1,
+            1, 0, 3328, 0, 3328, 0, 1, 3327, 0, 0, 1, 3328, 1, 3328, 1, 1, 3328, 2, 3328, 0, 0,
+            3328, 1, 3327, 0, 3327, 1, 3328, 3327, 0, 0, 3328, 1, 0, 1, 1, 3328, 1, 3328, 0, 0, 0,
+            2, 3328, 2, 3328, 0, 3328, 2, 3328, 0, 0, 1, 0, 3328, 2, 0, 0, 2, 3328, 3328, 0, 3327,
+            3328, 1, 0, 0, 1, 0, 3328, 3328, 1, 3328, 3327, 0, 3327, 3328, 0, 0, 0, 0, 3328, 0, 1,
+            0, 0, 0, 2, 3327, 1, 1, 0, 0, 1, 0, 0, 3327, 1, 3327, 0, 0, 0, 0, 1, 3327, 1, 1,
+        ]
+        .map(|val| F::new(val));
+
+        let b = RingElement::new(result);
+        assert_eq!(a.coefficients, b.coefficients);
+    }
 
     #[test]
     fn test_additive_commutativity() {
