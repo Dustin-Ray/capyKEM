@@ -6,12 +6,13 @@ use sha3::{
 };
 
 use crate::{
+    constants::parameter_sets::ParameterSet,
     math::{ntt::NttElement, ring_element::RingElement},
     Message,
 };
 
 impl Message {
-    fn k_pke_encrypt(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
+    fn k_pke_encrypt<P: ParameterSet>(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
         let k = self.k as usize;
         let mut n = 0;
         let t_hat = RingElement::from(&ek_pke[0..384 * k]);
@@ -28,17 +29,17 @@ impl Message {
         // generate e1
         let mut e_1 = vec![RingElement::zero(); k];
         for e_elem in e_1.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd(r, n);
+            *e_elem = RingElement::sample_poly_cbd::<P>(r, n);
             n += 1;
         }
 
         // generate e2
-        let e2 = RingElement::sample_poly_cbd(r, n);
+        let e2 = RingElement::sample_poly_cbd::<P>(r, n);
 
         // generate r, run ntt k times
         let mut r_hat = vec![NttElement::zero(); k];
         for r_elem in r_hat.iter_mut().take(k) {
-            *r_elem = RingElement::sample_poly_cbd(r, n).into();
+            *r_elem = RingElement::sample_poly_cbd::<P>(r, n).into();
             n += 1;
         }
 

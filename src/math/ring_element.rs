@@ -7,6 +7,7 @@ use sha3::{
     Shake256,
 };
 
+use crate::constants::parameter_sets::ParameterSet;
 use crate::{
     constants::ml_kem_constants::{self, N},
     math::field_element::FieldElement as F,
@@ -80,7 +81,7 @@ impl RingElement {
 
     // REMARKS:
     // TODO: parameterize eta1 and eta 2
-    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
+    pub fn sample_poly_cbd<P: ParameterSet>(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
         prf.update(&[b]);
@@ -199,6 +200,8 @@ mod tests {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
+    use crate::constants::parameter_sets::P768;
+
     use super::*;
 
     // REMARKS:
@@ -213,7 +216,7 @@ mod tests {
     fn test_sample_poly_cbd() {
         let bytes = "example input bytes".as_bytes();
 
-        let a = RingElement::sample_poly_cbd(&bytes, 0x01);
+        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0x01);
 
         // testing against the great Filippo Valsorda https://github.com/FiloSottile/mlkem768
         let result = [
@@ -244,8 +247,8 @@ mod tests {
             .collect();
 
         // Step 1: Initialize a RingElement with random values
-        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
-        let b = RingElement::sample_poly_cbd(&bytes, 0xBB);
+        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
+        let b = RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB);
 
         // Perform the addition in both orders
         let a_plus_b = a + b;
@@ -261,8 +264,8 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
-        let b = RingElement::sample_poly_cbd(&bytes, 0xBB);
+        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
+        let b = RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB);
 
         let result = a + b;
 
@@ -279,7 +282,7 @@ mod tests {
             .collect();
 
         // Step 1: Initialize a RingElement with random values
-        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
         let zero = RingElement::zero();
 
         // Adding the additive identity to a should result in a
@@ -324,7 +327,7 @@ mod tests {
             .collect();
 
         // Initialize a RingElement with random values
-        let a = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
 
         // Encode the RingElement to bytes
         let encoded_bytes = a.byte_encode();

@@ -8,6 +8,7 @@ use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 use crate::constants::{
     barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
     ml_kem_constants::Q,
+    parameter_sets::ParameterSet,
 };
 
 pub enum OperationError {
@@ -31,11 +32,10 @@ impl FieldElement {
         FieldElement::new(0)
     }
 
-    // Change to modify `self` in place instead of consuming it
     fn reduce_once(&mut self) {
         let mut x = self.val.wrapping_sub(Q);
         x = x.wrapping_add((x >> 15).wrapping_mul(Q));
-        self.val = x; // Apply the modification directly to `self`
+        self.val = x;
     }
 
     pub fn default() -> Self {
@@ -57,7 +57,7 @@ impl FieldElement {
     // FIPS 203 (DRAFT), Definition 4.5.
     // REMARKS:
     // parameterize du and dv
-    pub fn compress(&self, d: u8) -> u16 {
+    pub fn compress<P: ParameterSet>(&self, d: u8) -> u16 {
         let dividend = (self.val as u64).wrapping_shl(d.into());
         let quotient = dividend
             .wrapping_mul(bar_mul.into())
@@ -75,7 +75,7 @@ impl FieldElement {
     }
 
     /// FIPS 203 (DRAFT), Definition 4.6
-    pub fn decompress(&self, d: u8) -> u16 {
+    pub fn decompress<P: ParameterSet>(&self, d: u8) -> u16 {
         let dividend = self.val as u32;
         let dividend = dividend.wrapping_mul(Q.into());
         let mut quotient = dividend.wrapping_shr(d.into());
@@ -161,6 +161,8 @@ impl Sub for FieldElement {
 
 #[cfg(test)]
 mod tests {
+    use crate::constants::parameter_sets::P768;
+
     use super::Q;
     use super::*;
 
@@ -250,7 +252,7 @@ mod tests {
 
         for (val, expected) in test_cases {
             let fe = FieldElement { val };
-            let compressed = fe.compress(d);
+            let compressed = fe.compress::<P768>(d);
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
@@ -268,7 +270,7 @@ mod tests {
 
         for (val, expected) in test_cases {
             let fe = FieldElement { val };
-            let compressed = fe.decompress(d);
+            let compressed = fe.decompress::<P768>(d);
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
@@ -276,7 +278,7 @@ mod tests {
     #[test]
     fn test_compress_with_mask() {
         let fe = FieldElement { val: 12345 };
-        let compressed = fe.compress(10);
+        let compressed = fe.compress::<P768>(10);
         assert!(
             compressed < 1024,
             "Compressed value should be within the mask limit"
@@ -291,9 +293,9 @@ mod tests {
 
         for &original in &original_values {
             let fe = FieldElement::new(original);
-            let decompressed = fe.decompress(d);
+            let decompressed = fe.decompress::<P768>(d);
             let decompressed_fe = FieldElement::new(decompressed);
-            let compressed = decompressed_fe.compress(d);
+            let compressed = decompressed_fe.compress::<P768>(d);
             assert_eq!(
                 compressed, original,
                 "Original value: {}, Decompressed then Compressed value: {}",

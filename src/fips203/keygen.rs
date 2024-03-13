@@ -6,6 +6,7 @@ use sha3::{
 };
 
 use crate::{
+    constants::parameter_sets::{ParameterSet, P768},
     math::{ntt::NttElement, ring_element::RingElement},
     Message,
 };
@@ -13,7 +14,7 @@ use crate::{
 // NOTES:
 // TODO: determine difference between PRF and XOF here
 impl Message {
-    fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
+    fn k_pke_keygen<P: ParameterSet>(&self) -> (Vec<u8>, Vec<u8>) {
         let mut xof = Shake256::default(); // I think this should be 512 -> 256 bits of security
         let bytes: Vec<u8> = (0..32).map(|_| ChaCha20Rng::from_entropy().gen()).collect();
 
@@ -39,14 +40,14 @@ impl Message {
         // generate s
         let mut s = vec![NttElement::zero(); k];
         for s_elem in s.iter_mut().take(k) {
-            *s_elem = RingElement::sample_poly_cbd(sigma, n).into();
+            *s_elem = RingElement::sample_poly_cbd::<P>(sigma, n).into();
             n += 1;
         }
 
         // generate e
         let mut e = vec![NttElement::zero(); k];
         for e_elem in e.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd(sigma, n).into();
+            *e_elem = RingElement::sample_poly_cbd::<P>(sigma, n).into();
             n += 1;
         }
 
@@ -83,7 +84,7 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use crate::Message;
+    use crate::{constants::parameter_sets::P768, Message};
 
     #[test]
     fn test_keygen() {
@@ -95,7 +96,7 @@ mod tests {
             eta_1: 2,
             eta_2: 2,
         };
-        let (ek, dk) = m.k_pke_keygen();
+        let (ek, dk) = m.k_pke_keygen::<P768>();
 
         // Convert to hexadecimal string and print
         println!("Encryption Key: {}", hex::encode(&ek));

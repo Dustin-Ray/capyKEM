@@ -7,7 +7,7 @@ use core::fmt;
 use core::ops::{AddAssign, Mul};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
-    Shake128, Shake256,
+    Shake128,
 };
 #[derive(Clone, Copy)]
 pub struct NttElement {
@@ -191,6 +191,8 @@ mod tests {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
+    use crate::constants::parameter_sets::P768;
+
     use super::*;
 
     // REMARKS:
@@ -249,7 +251,7 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
         // Sample a ring element using the random byte stream
-        let mut ring_element = RingElement::sample_poly_cbd(&bytes, 0xFF);
+        let mut ring_element = RingElement::sample_poly_cbd::<P768>(&bytes, 0xFF);
         let ring_element_copy = ring_element;
 
         // runs .ntt() on intstantiation
@@ -266,9 +268,9 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-        let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
-        let c = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xCC));
+        let a = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA));
+        let b = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB));
+        let c = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xCC));
 
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
@@ -291,7 +293,7 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+        let a = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA));
         let zero = NttElement::zero();
 
         // Test multiplicative identity
@@ -318,8 +320,8 @@ mod tests {
                 .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
                 .collect();
 
-            let a = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-            let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
+            let a = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA));
+            let b = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB));
 
             let result = a * b;
             assert!(

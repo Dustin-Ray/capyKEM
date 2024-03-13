@@ -12,38 +12,39 @@ pub mod parameter_sets {
     // 768 -> RBG(192)
     // 1024 -> RBG(256)
 
-    pub mod k {
-        pub const K_512: u16 = 2;
-        pub const K_768: u16 = 3;
-        pub const K_1024: u16 = 4;
+    pub trait ParameterSet {
+        const K: u16;
+        const ETA_ONE: u16;
+        const ETA_TWO: u16;
+        const Du: u16;
+        const Dv: u16;
     }
 
-    pub mod eta_1 {
-        pub const ETA_ONE_512: u16 = 3;
-        pub const ETA_ONE_768: u16 = 2;
-        pub const ETA_ONE_1024: u16 = 2;
+    pub struct P512;
+    impl ParameterSet for P512 {
+        const K: u16 = 2;
+        const ETA_ONE: u16 = 3;
+        const ETA_TWO: u16 = 2;
+        const Du: u16 = 10;
+        const Dv: u16 = 4;
     }
 
-    pub mod eta_two {
-        pub const ETA_TWO_512: u16 = 2;
-        pub const ETA_TWO_768: u16 = 2;
-        pub const ETA_TWO_1024: u16 = 2;
+    pub struct P768;
+    impl ParameterSet for P768 {
+        const K: u16 = 3;
+        const ETA_ONE: u16 = 2;
+        const ETA_TWO: u16 = 2;
+        const Du: u16 = 10;
+        const Dv: u16 = 4;
     }
 
-    pub mod du {
-        pub const Du_512: u16 = 10;
-        pub const Du_768: u16 = 10;
-        pub const Du_1024: u16 = 11;
-    }
-
-    pub mod dv {
-        pub const Dv_512: u16 = 4;
-        pub const Dv_768: u16 = 4;
-        pub const Dv_1024: u16 = 5;
-    }
-
-    pub mod encoding_size {
-        pub const ENCODE_SIZE_12: u16 = 12;
+    pub struct P1024;
+    impl ParameterSet for P1024 {
+        const K: u16 = 4;
+        const ETA_ONE: u16 = 2;
+        const ETA_TWO: u16 = 2;
+        const Du: u16 = 11;
+        const Dv: u16 = 5;
     }
 }
 
