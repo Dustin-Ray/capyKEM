@@ -32,7 +32,7 @@ impl RingElement {
 
     // REMARKS:
     // TODO: parameterize du and dv
-    pub fn byte_encode(self) -> Vec<u8> {
+    pub fn byte_encode<P: ParameterSet>(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
         for i in (0..self.coefficients.len()).step_by(2) {
@@ -330,7 +330,7 @@ mod tests {
         let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
 
         // Encode the RingElement to bytes
-        let encoded_bytes = a.byte_encode();
+        let encoded_bytes = a.byte_encode::<P768>();
 
         // Decode the bytes back into a vector of F
         let decoded_elements = RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");

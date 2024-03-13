@@ -66,7 +66,7 @@ impl Message {
             .iter_mut()
             .take(k)
             .flat_map(|t_elem| {
-                let mut bytes = Into::<RingElement>::into(*t_elem).byte_encode();
+                let mut bytes = Into::<RingElement>::into(*t_elem).byte_encode::<P>();
                 bytes.extend_from_slice(rho);
                 bytes
             })
@@ -75,7 +75,7 @@ impl Message {
         let dk_pke: Vec<u8> = s
             .iter_mut()
             .take(k)
-            .flat_map(|s_elem| Into::<RingElement>::into(*s_elem).byte_encode())
+            .flat_map(|s_elem| Into::<RingElement>::into(*s_elem).byte_encode::<P>())
             .collect();
 
         (ek_pke, dk_pke)
