@@ -4,15 +4,15 @@ use crate::{
     Message,
 };
 
-impl<P: ParameterSet> Message<P> {
+impl<P: ParameterSet + core::marker::Copy> Message<P> {
     fn k_pke_encrypt(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
         let k = P::K as usize;
         let mut n = 0;
-        let t_hat = RingElement::from(&ek_pke[0..384 * k]);
+        let t_hat: RingElement<P> = RingElement::from(&ek_pke[0..384 * k]);
         let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
 
         // Generate the matrix a_hat
-        let mut a_hat = vec![NttElement::zero(); k * k];
+        let mut a_hat = vec![NttElement::<P>::zero(); k * k];
         for i in 0..k {
             for j in 0..k {
                 a_hat[i * k + j] = NttElement::sample_ntt(rho, i, j);
@@ -22,17 +22,17 @@ impl<P: ParameterSet> Message<P> {
         // generate e1
         let mut e_1 = vec![RingElement::zero(); k];
         for e_elem in e_1.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd::<P>(r, n);
+            *e_elem = RingElement::sample_poly_cbd(r, n);
             n += 1;
         }
 
         // generate e2
-        let e2 = RingElement::sample_poly_cbd::<P>(r, n);
+        let e2: RingElement<P> = RingElement::sample_poly_cbd(r, n);
 
         // generate r, run ntt k times
         let mut r_hat = vec![NttElement::zero(); k];
         for r_elem in r_hat.iter_mut().take(k) {
-            *r_elem = RingElement::sample_poly_cbd::<P>(r, n).into();
+            *r_elem = RingElement::sample_poly_cbd(r, n).into();
             n += 1;
         }
 

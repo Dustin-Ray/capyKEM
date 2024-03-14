@@ -1,13 +1,9 @@
-// use crypto_bigint::modular::ConstMontyParams;
-// use crypto_bigint::{const_monty_form, impl_modulus, Uint, U64};
-// use crypto_bigint::{rand_core::OsRng, NonZero, RandomMod};
-// use rand::Rng;
-
+use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 
+use crate::constants::ml_kem_constants::Q;
 use crate::constants::{
     barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
-    ml_kem_constants::Q,
     parameter_sets::ParameterSet,
 };
 
@@ -15,21 +11,28 @@ pub enum OperationError {
     UnreducedFieldElementError,
 }
 
-/// An integer modulo q
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct FieldElement {
+/// An integer modulo Q
+pub struct FieldElement<P> {
     val: u16,
+    _marker: PhantomData<P>,
 }
 
-impl FieldElement {
+impl<P: ParameterSet> FieldElement<P> {
     pub fn new(val: u16) -> Self {
-        let mut f = FieldElement { val };
+        let mut f = FieldElement {
+            val,
+            _marker: PhantomData,
+        };
         f.reduce_once();
         f
     }
 
     pub fn zero() -> Self {
-        FieldElement { val: 0 }
+        FieldElement {
+            val: 0,
+            _marker: PhantomData,
+        }
     }
 
     fn reduce_once(&mut self) {
@@ -53,7 +56,7 @@ impl FieldElement {
     // FIPS 203 (DRAFT), Definition 4.5.
     // TODO: sometimes these might need to be called with
     // values of du/dv that are different from param defs
-    pub fn compress<P: ParameterSet>(&self) -> u16 {
+    pub fn compress(&self) -> u16 {
         let dividend = (self.val as u64).wrapping_shl(P::Du.into());
         let quotient = dividend
             .wrapping_mul(bar_mul.into())
@@ -71,7 +74,7 @@ impl FieldElement {
     }
 
     /// FIPS 203 (DRAFT), Definition 4.6
-    pub fn decompress<P: ParameterSet>(&self) -> u16 {
+    pub fn decompress(&self) -> u16 {
         let dividend = self.val as u32;
         let dividend = dividend.wrapping_mul(Q.into());
         let mut quotient = dividend.wrapping_shr(P::Dv.into());
@@ -85,13 +88,13 @@ impl FieldElement {
     }
 }
 
-impl AddAssign for FieldElement {
+impl<P: ParameterSet + Copy> AddAssign for FieldElement<P> {
     fn add_assign(&mut self, other: Self) {
         self.val = (self.val + other.val) % Q;
     }
 }
 
-impl Neg for FieldElement {
+impl<P: ParameterSet> Neg for FieldElement<P> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -100,7 +103,7 @@ impl Neg for FieldElement {
     }
 }
 
-impl Mul<u16> for FieldElement {
+impl<P: ParameterSet> Mul<u16> for FieldElement<P> {
     type Output = Self;
 
     fn mul(self, other: u16) -> Self {
@@ -109,39 +112,39 @@ impl Mul<u16> for FieldElement {
     }
 }
 
-impl Mul<FieldElement> for u16 {
+impl<P: ParameterSet> Mul<FieldElement<P>> for u16 {
     type Output = Self;
 
-    fn mul(self, other: FieldElement) -> Self {
+    fn mul(self, other: FieldElement<P>) -> Self {
         let product = (other.val as u32) * (self as u32);
-        FieldElement::barrett_reduce(product).val
+        FieldElement::<P>::barrett_reduce(product).val
     }
 }
 
-impl Mul<FieldElement> for FieldElement {
+impl<P: ParameterSet> Mul<FieldElement<P>> for FieldElement<P> {
     type Output = Self;
 
-    fn mul(self, other: FieldElement) -> Self {
+    fn mul(self, other: FieldElement<P>) -> Self {
         let product = (other.val as u32) * (self.val as u32);
         FieldElement::barrett_reduce(product)
     }
 }
 
-impl Add for FieldElement {
+impl<P: ParameterSet> Add for FieldElement<P> {
     type Output = Self;
 
-    // a + b % q
+    // a + b % Q
     fn add(self, other: Self) -> Self {
         Self::new(self.val + other.val)
     }
 }
 
-impl Sub for FieldElement {
+impl<P: ParameterSet> Sub for FieldElement<P> {
     type Output = Self;
 
-    // a - b % q
+    // a - b % Q
     fn sub(self, other: Self) -> Self {
-        // If `self.val` is less than `other.val`, adding `q`
+        // If `self.val` is less than `other.val`, adding `Q`
         // ensures the result stays positive and wraps around correctly.
         let result = if self.val < other.val {
             self.val + Q - other.val
@@ -154,18 +157,25 @@ impl Sub for FieldElement {
 
 #[cfg(test)]
 mod tests {
-    use crate::constants::parameter_sets::P768;
+    use core::marker::PhantomData;
 
-    use super::Q;
-    use super::*;
+    use crate::{
+        constants::{ml_kem_constants::Q, parameter_sets::P768},
+        math::field_element::FieldElement as F,
+    };
+
+    // REMARK:
+    // because the field Q is so small, it is actually possible
+    // to test arithmetic operations on every single element
+    // of the field
 
     #[test]
     fn exhaustive_test_reduce_once() {
         for i in Q + 1..=2 * Q {
-            let element = FieldElement::new(i);
+            let element: F<P768> = F::new(i);
             assert!(
                 element.val <= Q,
-                "Value should be reduced within [0, q] range for input: {i}, but got: {}",
+                "Value should be reduced within [0, Q] range for input: {i}, but got: {}",
                 element.val
             );
         }
@@ -175,8 +185,8 @@ mod tests {
     fn exhaustive_test_addition() {
         for i in 0..3329 {
             for j in 0..3329 {
-                let a = FieldElement::new(i);
-                let b = FieldElement::new(j);
+                let a: F<P768> = F::new(i);
+                let b: F<P768> = F::new(j);
                 let result = a + b;
                 assert_eq!(result.val, (i + j) % 3329);
             }
@@ -187,8 +197,8 @@ mod tests {
     fn exhaustive_test_subtraction() {
         for i in 0..3329 {
             for j in 0..3329 {
-                let a = FieldElement::new(i);
-                let b = FieldElement::new(j);
+                let a: F<P768> = F::new(i);
+                let b: F<P768> = F::new(j);
                 let result = a - b;
                 let expected = (i as isize - j as isize + 3329 as isize) % 3329;
 
@@ -201,7 +211,7 @@ mod tests {
     fn exhaustive_test_multiplication() {
         for i in 0..3329 {
             for j in 0..3329 {
-                let a = FieldElement::new(i);
+                let a: F<P768> = F::new(i);
                 let b = j;
                 let result = a * b;
                 let expected = (i as u32 * j as u32) % 3329;
@@ -212,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_multiplication_with_potential_overflow() {
-        let a = FieldElement::new(3000);
+        let a: F<P768> = F::new(3000);
         let b = 3000;
         let result = a * b;
         let expected = (3000u32 * 3000u32) % 3329u32;
@@ -224,52 +234,66 @@ mod tests {
 
     #[test]
     fn test_check_reduced_ok() {
-        assert!(FieldElement::new(Q - 1).check_reduced().is_ok());
+        assert!(F::<P768>::new(Q - 1).check_reduced().is_ok());
     }
 
     #[test]
     fn test_check_reduced_err() {
-        assert!(FieldElement { val: Q + 1 }.check_reduced().is_err());
+        assert!(F {
+            val: Q + 1,
+            _marker: PhantomData::<P768>
+        }
+        .check_reduced()
+        .is_err());
     }
 
-    // Test that verifies compression into a range with d = 10, where q is assumed to be 3329.
+    // Test that verifies compression into a range with d = 10, where Q is assumed to be 3329.
     #[test]
     fn test_compress() {
         let test_cases = vec![
             // (input value, expected compressed output)
             (0, 0),      // A value that maps directly to 0
-            (1664, 512), // A value around q/2 should map near the middle of the range
-            (3328, 0),   // A value around q should map to the upper end of the range
+            (1664, 512), // A value around Q/2 should map near the middle of the range
+            (3328, 0),   // A value around Q should map to the upper end of the range
         ];
 
         for (val, expected) in test_cases {
-            let fe = FieldElement { val };
-            let compressed = fe.compress::<P768>();
+            let fe: F<P768> = F {
+                val,
+                _marker: PhantomData,
+            };
+            let compressed = fe.compress();
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
 
-    // Test that verifies compression into a range with d = 10, where q is assumed to be 3329.
+    // Test that verifies compression into a range with d = 10, where Q is assumed to be 3329.
     #[test]
     fn test_decompress() {
         let test_cases = vec![
             // (input value, expected compressed output)
             (0, 0),        // A value that maps directly to 0
-            (1664, 18536), // A value around q/2 should map near the middle of the range
-            (3328, 37072), // A value around q should map to the upper end of the range
+            (1664, 18536), // A value around Q/2 should map near the middle of the range
+            (3328, 37072), // A value around Q should map to the upper end of the range
         ];
 
         for (val, expected) in test_cases {
-            let fe = FieldElement { val };
-            let compressed = fe.decompress::<P768>();
+            let fe: F<P768> = F {
+                val,
+                _marker: PhantomData,
+            };
+            let compressed = fe.decompress();
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
 
     #[test]
     fn test_compress_with_mask() {
-        let fe = FieldElement { val: 12345 };
-        let compressed = fe.compress::<P768>();
+        let fe: F<P768> = F {
+            val: 12345,
+            _marker: PhantomData,
+        };
+        let compressed = fe.compress();
         assert!(
             compressed < 1024,
             "Compressed value should be within the mask limit"

@@ -7,6 +7,7 @@ pub mod ml_kem_constants {
 
 // appendix table 2
 #[allow(dead_code)]
+
 pub mod parameter_sets {
 
     // Requireed random bit generator strength
@@ -15,15 +16,13 @@ pub mod parameter_sets {
     // 1024 -> RBG(256)
 
     pub trait ParameterSet {
-        const Q: u16 = 3329;
-        const N: u16 = 256;
         const K: u16;
         const ETA_ONE: u16;
         const ETA_TWO: u16;
         const Du: u16;
         const Dv: u16;
     }
-
+    #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct P512;
     impl ParameterSet for P512 {
         const K: u16 = 2;
@@ -32,7 +31,7 @@ pub mod parameter_sets {
         const Du: u16 = 10;
         const Dv: u16 = 4;
     }
-
+    #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct P768;
     impl ParameterSet for P768 {
         const K: u16 = 3;
@@ -41,7 +40,7 @@ pub mod parameter_sets {
         const Du: u16 = 10;
         const Dv: u16 = 4;
     }
-
+    #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct P1024;
     impl ParameterSet for P1024 {
         const K: u16 = 4;

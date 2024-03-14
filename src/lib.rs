@@ -10,7 +10,7 @@ mod fips203;
 #[allow(dead_code)]
 mod math;
 
-pub struct Message<P: ParameterSet> {
+pub struct Message<P> {
     pub m: [u8; 32],
     _marker: PhantomData<P>,
 }
@@ -18,7 +18,7 @@ pub struct Message<P: ParameterSet> {
 impl<P: ParameterSet> Message<P> {
     // Constructor function
     pub fn new(data: [u8; 32]) -> Self {
-        Message {
+        Message::<P> {
             m: data,
             _marker: PhantomData,
         }

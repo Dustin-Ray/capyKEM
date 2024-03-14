@@ -7,22 +7,20 @@ use sha3::{
     Shake256,
 };
 
+use crate::constants::ml_kem_constants::{self, N};
 use crate::constants::parameter_sets::ParameterSet;
-use crate::{
-    constants::ml_kem_constants::{self, N},
-    math::field_element::FieldElement as F,
-};
+use crate::math::field_element::FieldElement as F;
 
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [F].
 #[derive(Clone, Copy)]
-pub struct RingElement {
-    pub coefficients: [F; 256],
+pub struct RingElement<P> {
+    pub coefficients: [F<P>; 256],
 }
 
-impl RingElement {
+impl<P: ParameterSet + Copy> RingElement<P> {
     // Create a new RingElement from a vector of FieldElements
-    pub fn new(val: [F; 256]) -> Self {
+    pub fn new(val: [F<P>; 256]) -> Self {
         RingElement { coefficients: val }
     }
 
@@ -32,7 +30,7 @@ impl RingElement {
 
     // REMARKS:
     // TODO: parameterize du and dv
-    pub fn byte_encode<P: ParameterSet>(self) -> Vec<u8> {
+    pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
         for i in (0..self.coefficients.len()).step_by(2) {
@@ -53,7 +51,7 @@ impl RingElement {
             return Err("Invalid encoding length");
         }
 
-        let mut f = Vec::with_capacity(ml_kem_constants::N.into());
+        let mut f = Vec::with_capacity(N.into());
         let mut i = 0;
         while i < b.len() {
             let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
@@ -72,7 +70,7 @@ impl RingElement {
 
             i += 3;
         }
-        let array: [F; 256] = f
+        let array: [F<P>; 256] = f
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;
 
@@ -81,7 +79,7 @@ impl RingElement {
 
     // REMARKS:
     // TODO: parameterize eta1 and eta 2
-    pub fn sample_poly_cbd<P: ParameterSet>(s: &[u8], b: u8) -> RingElement {
+    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement<P> {
         let mut prf = Shake256::default();
         prf.update(s);
         prf.update(&[b]);
@@ -114,7 +112,7 @@ impl RingElement {
     }
 }
 
-impl fmt::Debug for RingElement {
+impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.coefficients.iter().enumerate() {
             write!(f, "{:<8}", element.val())?;
@@ -127,19 +125,19 @@ impl fmt::Debug for RingElement {
     }
 }
 
-impl From<[F; 256]> for RingElement {
-    fn from(val: [F; 256]) -> Self {
+impl<P: ParameterSet + Copy> From<[F<P>; 256]> for RingElement<P> {
+    fn from(val: [F<P>; 256]) -> Self {
         RingElement::new(val)
     }
 }
 
-impl From<&[u8]> for RingElement {
+impl<P: ParameterSet + Copy> From<&[u8]> for RingElement<P> {
     fn from(slice: &[u8]) -> Self {
         RingElement::byte_decode(slice).expect("failed to decode bytes, check reduction?")
     }
 }
 
-impl AddAssign for RingElement {
+impl<P: ParameterSet + Copy> AddAssign for RingElement<P> {
     fn add_assign(&mut self, other: Self) {
         for (lhs, rhs) in self.coefficients.iter_mut().zip(other.coefficients.iter()) {
             *lhs += *rhs;
@@ -147,7 +145,7 @@ impl AddAssign for RingElement {
     }
 }
 
-impl Add for RingElement {
+impl<P: ParameterSet + Copy> Add for RingElement<P> {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -165,7 +163,7 @@ impl Add for RingElement {
     }
 }
 
-impl Sub for RingElement {
+impl<P: ParameterSet + Copy> Sub for RingElement<P> {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -183,7 +181,7 @@ impl Sub for RingElement {
     }
 }
 
-impl PartialEq for RingElement {
+impl<P: ParameterSet + Copy + PartialEq> PartialEq for RingElement<P> {
     fn eq(&self, other: &Self) -> bool {
         if self.coefficients.len() != other.coefficients.len() {
             return false;
@@ -216,7 +214,7 @@ mod tests {
     fn test_sample_poly_cbd() {
         let bytes = "example input bytes".as_bytes();
 
-        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0x01);
+        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0x01);
 
         // testing against the great Filippo Valsorda https://github.com/FiloSottile/mlkem768
         let result = [
@@ -247,8 +245,8 @@ mod tests {
             .collect();
 
         // Step 1: Initialize a RingElement with random values
-        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
-        let b = RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB);
+        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let b = RingElement::sample_poly_cbd(&bytes, 0xBB);
 
         // Perform the addition in both orders
         let a_plus_b = a + b;
@@ -264,8 +262,8 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
-        let b = RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB);
+        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xAA);
+        let b = RingElement::sample_poly_cbd(&bytes, 0xBB);
 
         let result = a + b;
 
@@ -282,7 +280,7 @@ mod tests {
             .collect();
 
         // Step 1: Initialize a RingElement with random values
-        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
+        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xAA);
         let zero = RingElement::zero();
 
         // Adding the additive identity to a should result in a
@@ -303,7 +301,7 @@ mod tests {
     #[test]
     fn test_additive_inverse() {
         // Create an example RingElement a
-        let a_vals = [F::new(123); 256];
+        let a_vals: [F<P768>; 256] = [F::new(123); 256];
         let a = RingElement::new(a_vals);
         let mut inverse_vals = [F::zero(); 256];
         for (i, val) in a.coefficients.iter().enumerate() {
@@ -327,13 +325,14 @@ mod tests {
             .collect();
 
         // Initialize a RingElement with random values
-        let a = RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA);
+        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xAA);
 
         // Encode the RingElement to bytes
-        let encoded_bytes = a.byte_encode::<P768>();
+        let encoded_bytes = a.byte_encode();
 
         // Decode the bytes back into a vector of F
-        let decoded_elements = RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");
+        let decoded_elements: RingElement<P768> =
+            RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");
 
         // Verify the decoded vector matches the original RingElement's array
         assert_eq!(

@@ -27,10 +27,11 @@ fn mod_pow(base: u32, exp: u32, modulus: u32) -> u16 {
 
 #[cfg(test)]
 mod tests {
-    use crate::constants::{ml_kem_constants::Q, K_INVERSE_NTT_ROOTS, K_MOD_ROOTS, K_NTT_ROOTS};
+    use crate::constants::{K_INVERSE_NTT_ROOTS, K_MOD_ROOTS, K_NTT_ROOTS};
 
     use super::*;
 
+    const Q: u16 = 3329;
     #[test]
     fn create_and_test_kntt_roots() {
         let kntt_roots: Vec<u16> = (0..128)
@@ -43,7 +44,7 @@ mod tests {
     fn create_and_test_k_inverse_ntt_roots() {
         let k_inverse_ntt_roots: Vec<u16> = (0..128)
             .map(|i| {
-                let exp = (Q as u16) - 1 - bitreverse(i);
+                let exp = Q - 1 - bitreverse(i);
                 mod_pow(17, exp.into(), Q.into())
             })
             .collect();

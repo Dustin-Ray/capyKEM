@@ -1,8 +1,7 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
-use crate::constants::{
-    ml_kem_constants::{N, Q},
-    K_MOD_ROOTS, K_NTT_ROOTS,
-};
+use crate::constants::ml_kem_constants::{N, Q};
+use crate::constants::parameter_sets::ParameterSet;
+use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
 use core::fmt;
 use core::ops::{AddAssign, Mul};
 use sha3::{
@@ -10,12 +9,12 @@ use sha3::{
     Shake128,
 };
 #[derive(Clone, Copy)]
-pub struct NttElement {
-    ring: [F; 256],
+pub struct NttElement<P> {
+    ring: [F<P>; 256],
 }
 
-impl NttElement {
-    fn new(r: &mut RingElement) -> Self {
+impl<P: ParameterSet + Copy> NttElement<P> {
+    fn new(r: &mut RingElement<P>) -> Self {
         let mut ntt_el = NttElement {
             ring: r.coefficients,
         };
@@ -29,11 +28,11 @@ impl NttElement {
         }
     }
 
-    pub fn get_ring(&self) -> [F; 256] {
+    pub fn get_ring(&self) -> [F<P>; 256] {
         self.ring
     }
 
-    pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement {
+    pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement<P> {
         let mut hasher = Shake128::default();
         hasher.update(rho);
         hasher.update(&[ii.try_into().unwrap(), jj.try_into().unwrap()]);
@@ -44,11 +43,9 @@ impl NttElement {
         let mut j = 0usize;
         let mut buf = [0u8; 24];
         let mut off = 24usize;
-        println!("{:?}", buf);
         while j < N.into() {
             if off >= 24 {
                 reader.read(&mut buf);
-                println!("{:?}", buf);
                 off = 0;
             }
 
@@ -90,7 +87,7 @@ impl NttElement {
         h_hat
     }
 
-    fn base_case_multiply(a_0: F, a_1: F, b_0: F, b_1: F, gamma: u16) -> (F, F) {
+    fn base_case_multiply(a_0: F<P>, a_1: F<P>, b_0: F<P>, b_1: F<P>, gamma: u16) -> (F<P>, F<P>) {
         let c_0 = (a_0 * b_0) + (a_1 * b_1) * gamma;
         let c_1 = (a_0 * b_1) + (a_1 * b_0);
         (c_0, c_1)
@@ -116,7 +113,7 @@ impl NttElement {
     }
 
     // This should only be used when converting to Rq
-    fn ntt_inv(&mut self) -> RingElement {
+    fn ntt_inv(&mut self) -> RingElement<P> {
         let mut k = 127;
         let mut len = 2;
         while len <= 128 {
@@ -139,7 +136,7 @@ impl NttElement {
     }
 }
 
-impl AddAssign for NttElement {
+impl<P: ParameterSet + Copy> AddAssign for NttElement<P> {
     fn add_assign(&mut self, other: Self) {
         for (lhs, rhs) in self.ring.iter_mut().zip(other.ring.iter()) {
             *lhs += *rhs;
@@ -147,33 +144,33 @@ impl AddAssign for NttElement {
     }
 }
 
-impl From<RingElement> for NttElement {
-    fn from(mut val: RingElement) -> Self {
+impl<P: ParameterSet + Copy> From<RingElement<P>> for NttElement<P> {
+    fn from(mut val: RingElement<P>) -> Self {
         NttElement::new(&mut val)
     }
 }
 
-impl From<NttElement> for RingElement {
-    fn from(mut val: NttElement) -> Self {
+impl<P: ParameterSet + Copy> From<NttElement<P>> for RingElement<P> {
+    fn from(mut val: NttElement<P>) -> Self {
         val.ntt_inv()
     }
 }
 
-impl PartialEq for NttElement {
+impl<P: ParameterSet + Copy + core::cmp::PartialEq> PartialEq for NttElement<P> {
     fn eq(&self, other: &Self) -> bool {
         self.ring.iter().zip(other.ring.iter()).all(|(a, b)| a == b)
     }
 }
 
-impl Mul<NttElement> for NttElement {
+impl<P: ParameterSet + Copy> Mul<NttElement<P>> for NttElement<P> {
     type Output = Self;
 
-    fn mul(self, rhs: NttElement) -> Self::Output {
+    fn mul(self, rhs: NttElement<P>) -> Self::Output {
         self.multiply_ntts(rhs)
     }
 }
 
-impl fmt::Debug for NttElement {
+impl<P: ParameterSet + Copy> fmt::Debug for NttElement<P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.ring.iter().enumerate() {
             write!(f, "{:<8}", element.val())?;
@@ -210,7 +207,7 @@ mod tests {
         let a = NttElement::sample_ntt(&byte_stream, 0, 1);
 
         // testing against the great Filippo Valsorda https://github.com/FiloSottile/mlkem768
-        let result: [F; 256] = [
+        let result: [F<P768>; 256] = [
             2278, 18, 2449, 1376, 2453, 1346, 66, 738, 2100, 1008, 950, 2669, 2121, 3030, 880,
             2569, 3146, 1432, 1285, 2106, 1943, 895, 2326, 3255, 1301, 1752, 1281, 2500, 3149,
             1061, 959, 687, 199, 1817, 1651, 2069, 3091, 2864, 120, 2222, 3005, 1823, 2721, 3012,
@@ -237,7 +234,7 @@ mod tests {
     #[test]
     fn test_ntt() {
         // sample output is in NTT domain
-        let mut byte_stream = NttElement::sample_ntt(&vec![42_u8; 32], 1, 1);
+        let mut byte_stream: NttElement<P768> = NttElement::sample_ntt(&vec![42_u8; 32], 1, 1);
         let mut byte_stream_copy = byte_stream;
         byte_stream.ntt_inv();
         byte_stream_copy.ntt_inv();
@@ -251,14 +248,14 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
         // Sample a ring element using the random byte stream
-        let mut ring_element = RingElement::sample_poly_cbd::<P768>(&bytes, 0xFF);
+        let mut ring_element: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xFF);
         let ring_element_copy = ring_element;
 
         // runs .ntt() on intstantiation
         let ntt_element = NttElement::new(&mut ring_element);
         assert_eq!(
             ring_element_copy.coefficients,
-            Into::<RingElement>::into(ntt_element).coefficients
+            Into::<RingElement<P768>>::into(ntt_element).coefficients
         );
     }
 
@@ -268,16 +265,16 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA));
-        let b = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB));
-        let c = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xCC));
+        let a: NttElement<P768> = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+        let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
+        let c = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xCC));
 
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
         let a_bc = a * (b * c);
         assert_eq!(ab_c.ring, a_bc.ring);
 
-        let a = NttElement::sample_ntt(&bytes.clone(), 0, 0);
+        let a: NttElement<P768> = NttElement::sample_ntt(&bytes.clone(), 0, 0);
         let b = NttElement::sample_ntt(&bytes.clone(), 0, 0);
         let c = NttElement::sample_ntt(&bytes.clone(), 0, 0);
 
@@ -293,7 +290,7 @@ mod tests {
             .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
             .collect();
 
-        let a = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA));
+        let a: NttElement<P768> = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
         let zero = NttElement::zero();
 
         // Test multiplicative identity
@@ -320,8 +317,9 @@ mod tests {
                 .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
                 .collect();
 
-            let a = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xAA));
-            let b = NttElement::new(&mut RingElement::sample_poly_cbd::<P768>(&bytes, 0xBB));
+            let a: NttElement<P768> =
+                NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
+            let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
 
             let result = a * b;
             assert!(

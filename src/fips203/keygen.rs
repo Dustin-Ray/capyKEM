@@ -13,7 +13,7 @@ use crate::{
 
 // NOTES:
 // TODO: determine difference between PRF and XOF here
-impl<P: ParameterSet> Message<P> {
+impl<P: ParameterSet + Copy> Message<P> {
     fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
         let mut xof = Shake256::default(); // I think this should be 512 -> 256 bits of security
         let bytes: Vec<u8> = (0..32).map(|_| ChaCha20Rng::from_entropy().gen()).collect();
@@ -40,14 +40,14 @@ impl<P: ParameterSet> Message<P> {
         // generate s
         let mut s = vec![NttElement::zero(); k];
         for s_elem in s.iter_mut().take(k) {
-            *s_elem = RingElement::sample_poly_cbd::<P>(sigma, n).into();
+            *s_elem = RingElement::sample_poly_cbd(sigma, n).into();
             n += 1;
         }
 
         // generate e
         let mut e = vec![NttElement::zero(); k];
         for e_elem in e.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd::<P>(sigma, n).into();
+            *e_elem = RingElement::sample_poly_cbd(sigma, n).into();
             n += 1;
         }
 
@@ -66,7 +66,7 @@ impl<P: ParameterSet> Message<P> {
             .iter_mut()
             .take(k)
             .flat_map(|t_elem| {
-                let mut bytes = Into::<RingElement>::into(*t_elem).byte_encode::<P>();
+                let mut bytes = Into::<RingElement<P>>::into(*t_elem).byte_encode();
                 bytes.extend_from_slice(rho);
                 bytes
             })
@@ -75,7 +75,7 @@ impl<P: ParameterSet> Message<P> {
         let dk_pke: Vec<u8> = s
             .iter_mut()
             .take(k)
-            .flat_map(|s_elem| Into::<RingElement>::into(*s_elem).byte_encode::<P>())
+            .flat_map(|s_elem| Into::<RingElement<P>>::into(*s_elem).byte_encode())
             .collect();
 
         (ek_pke, dk_pke)
@@ -84,15 +84,20 @@ impl<P: ParameterSet> Message<P> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{constants::parameter_sets::P768, Message};
+    use crate::{
+        constants::parameter_sets::{P1024, P512, P768},
+        Message,
+    };
 
     #[test]
-    fn test_keygen() {
-        let m: Message<P768> = Message::new([0_u8; 32]);
-        let (ek, dk) = m.k_pke_keygen();
+    fn test_instantiate_over_parameter_sets() {
+        let m_512: Message<P512> = Message::new([0_u8; 32]);
+        let (ek, dk) = m_512.k_pke_keygen();
 
-        // Convert to hexadecimal string and print
-        println!("Encryption Key: {}", hex::encode(&ek));
-        println!("Decryption Key: {}", hex::encode(&dk));
+        let m_768: Message<P768> = Message::new([0_u8; 32]);
+        let (ek, dk) = m_768.k_pke_keygen();
+
+        let m_1024: Message<P1024> = Message::new([0_u8; 32]);
+        let (ek, dk) = m_1024.k_pke_keygen();
     }
 }
