@@ -1,3 +1,6 @@
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::{
     constants::parameter_sets::ParameterSet,
     math::{ntt::NttElement, ring_element::RingElement},

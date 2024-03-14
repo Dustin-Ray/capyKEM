@@ -7,6 +7,8 @@ use sha3::{
     Shake256,
 };
 
+use alloc::vec::Vec;
+
 use crate::constants::ml_kem_constants::{self, N};
 use crate::constants::parameter_sets::ParameterSet;
 use crate::math::field_element::FieldElement as F;

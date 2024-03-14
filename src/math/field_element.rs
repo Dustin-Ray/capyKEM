@@ -250,6 +250,7 @@ mod tests {
     // Test that verifies compression into a range with d = 10, where Q is assumed to be 3329.
     #[test]
     fn test_compress() {
+        use alloc::vec;
         let test_cases = vec![
             // (input value, expected compressed output)
             (0, 0),      // A value that maps directly to 0
@@ -270,6 +271,7 @@ mod tests {
     // Test that verifies compression into a range with d = 10, where Q is assumed to be 3329.
     #[test]
     fn test_decompress() {
+        use alloc::vec;
         let test_cases = vec![
             // (input value, expected compressed output)
             (0, 0),        // A value that maps directly to 0

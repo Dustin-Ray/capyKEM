@@ -1,24 +1,27 @@
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
-use sha3::{
-    digest::{ExtendableOutput, Update, XofReader},
-    Shake256,
-};
-
 use crate::{
     constants::parameter_sets::ParameterSet,
     math::{ntt::NttElement, ring_element::RingElement},
     Message,
+};
+use alloc::vec;
+use alloc::vec::Vec;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
+use sha3::{
+    digest::{ExtendableOutput, XofReader},
+    Shake256,
 };
 
 // NOTES:
 // TODO: determine difference between PRF and XOF here
 impl<P: ParameterSet + Copy> Message<P> {
     fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
-        let mut xof = Shake256::default(); // I think this should be 512 -> 256 bits of security
-        let bytes: Vec<u8> = (0..32).map(|_| ChaCha20Rng::from_entropy().gen()).collect();
+        let xof = Shake256::default();
+        let seed = [0u8; 32]; // This should be a properly generated seed in a real application
+        let mut rng = ChaCha20Rng::from_seed(seed);
 
-        xof.update(&bytes);
+        let mut bytes = [0u8; 32];
+        rng.fill_bytes(&mut bytes);
         let mut b = [0_u8; 64];
         let mut reader = xof.finalize_xof();
         reader.read(&mut b);

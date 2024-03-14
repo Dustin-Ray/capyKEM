@@ -8,6 +8,7 @@ use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
+
 #[derive(Clone, Copy)]
 pub struct NttElement<P> {
     ring: [F<P>; 256],
@@ -188,6 +189,10 @@ mod tests {
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha20Rng;
 
+    extern crate alloc;
+
+    use alloc::vec::Vec;
+
     use crate::constants::parameter_sets::P768;
 
     use super::*;
@@ -233,6 +238,7 @@ mod tests {
 
     #[test]
     fn test_ntt() {
+        use alloc::vec;
         // sample output is in NTT domain
         let mut byte_stream: NttElement<P768> = NttElement::sample_ntt(&vec![42_u8; 32], 1, 1);
         let mut byte_stream_copy = byte_stream;

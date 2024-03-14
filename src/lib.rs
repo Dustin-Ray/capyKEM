@@ -1,6 +1,8 @@
-use core::marker::PhantomData;
+#![no_std]
+extern crate alloc;
 
 use constants::parameter_sets::ParameterSet;
+use core::marker::PhantomData;
 
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]
