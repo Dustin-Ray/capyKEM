@@ -6,15 +6,15 @@ use sha3::{
 };
 
 use crate::{
-    constants::parameter_sets::{ParameterSet, P768},
+    constants::parameter_sets::ParameterSet,
     math::{ntt::NttElement, ring_element::RingElement},
     Message,
 };
 
 // NOTES:
 // TODO: determine difference between PRF and XOF here
-impl Message {
-    fn k_pke_keygen<P: ParameterSet>(&self) -> (Vec<u8>, Vec<u8>) {
+impl<P: ParameterSet> Message<P> {
+    fn k_pke_keygen(&self) -> (Vec<u8>, Vec<u8>) {
         let mut xof = Shake256::default(); // I think this should be 512 -> 256 bits of security
         let bytes: Vec<u8> = (0..32).map(|_| ChaCha20Rng::from_entropy().gen()).collect();
 
@@ -26,7 +26,7 @@ impl Message {
         // (ρ, σ ) <- G(d)
         let rho: &[u8] = &b[32..64];
         let sigma = &b[32..64];
-        let k = self.k as usize;
+        let k = P::K as usize;
         let mut n = 0;
 
         // Generate the matrix a_hat
@@ -88,15 +88,8 @@ mod tests {
 
     #[test]
     fn test_keygen() {
-        let m = Message {
-            m: vec![],
-            k: 3,
-            du: 10,
-            dv: 4,
-            eta_1: 2,
-            eta_2: 2,
-        };
-        let (ek, dk) = m.k_pke_keygen::<P768>();
+        let m: Message<P768> = Message::new([0_u8; 32]);
+        let (ek, dk) = m.k_pke_keygen();
 
         // Convert to hexadecimal string and print
         println!("Encryption Key: {}", hex::encode(&ek));

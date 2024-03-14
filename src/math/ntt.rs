@@ -25,7 +25,7 @@ impl NttElement {
 
     pub fn zero() -> Self {
         NttElement {
-            ring: [F::default(); 256],
+            ring: [F::zero(); 256],
         }
     }
 

@@ -157,7 +157,7 @@ impl Add for RingElement {
             "RingElements must be of the same length"
         );
 
-        let mut result = [F::default(); 256];
+        let mut result = [F::zero(); 256];
         for (i, item) in self.coefficients.iter().enumerate().take(256) {
             result[i] = *item + other.coefficients[i];
         }
@@ -175,7 +175,7 @@ impl Sub for RingElement {
             "RingElements must be of the same length"
         );
 
-        let mut result = [F::default(); 256];
+        let mut result = [F::zero(); 256];
         for (i, item) in self.coefficients.iter().enumerate().take(256) {
             result[i] = *item - other.coefficients[i];
         }
@@ -305,7 +305,7 @@ mod tests {
         // Create an example RingElement a
         let a_vals = [F::new(123); 256];
         let a = RingElement::new(a_vals);
-        let mut inverse_vals = [F::default(); 256];
+        let mut inverse_vals = [F::zero(); 256];
         for (i, val) in a.coefficients.iter().enumerate() {
             inverse_vals[i] = -*val; // Negate each coefficient
         }

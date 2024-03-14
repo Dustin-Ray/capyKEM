@@ -1,3 +1,7 @@
+use core::marker::PhantomData;
+
+use constants::parameter_sets::ParameterSet;
+
 #[allow(dead_code)]
 #[allow(non_upper_case_globals)]
 mod constants;
@@ -6,11 +10,17 @@ mod fips203;
 #[allow(dead_code)]
 mod math;
 
-pub struct Message {
-    pub m: Vec<u8>,
-    pub k: u16,
-    pub du: u16,
-    pub dv: u16,
-    pub eta_1: u16,
-    pub eta_2: u16,
+pub struct Message<P: ParameterSet> {
+    pub m: [u8; 32],
+    _marker: PhantomData<P>,
+}
+
+impl<P: ParameterSet> Message<P> {
+    // Constructor function
+    pub fn new(data: [u8; 32]) -> Self {
+        Message {
+            m: data,
+            _marker: PhantomData,
+        }
+    }
 }

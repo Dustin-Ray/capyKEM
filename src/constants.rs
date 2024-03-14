@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 pub mod ml_kem_constants {
     pub const Q: u16 = 3329;
     pub const N: u16 = 256;
@@ -5,6 +6,7 @@ pub mod ml_kem_constants {
 }
 
 // appendix table 2
+#[allow(dead_code)]
 pub mod parameter_sets {
 
     // Requireed random bit generator strength
@@ -13,6 +15,8 @@ pub mod parameter_sets {
     // 1024 -> RBG(256)
 
     pub trait ParameterSet {
+        const Q: u16 = 3329;
+        const N: u16 = 256;
         const K: u16;
         const ETA_ONE: u16;
         const ETA_TWO: u16;

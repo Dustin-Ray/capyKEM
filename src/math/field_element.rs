@@ -29,17 +29,13 @@ impl FieldElement {
     }
 
     pub fn zero() -> Self {
-        FieldElement::new(0)
+        FieldElement { val: 0 }
     }
 
     fn reduce_once(&mut self) {
         let mut x = self.val.wrapping_sub(Q);
         x = x.wrapping_add((x >> 15).wrapping_mul(Q));
         self.val = x;
-    }
-
-    pub fn default() -> Self {
-        FieldElement { val: 0 }
     }
 
     pub fn check_reduced(self) -> Result<Self, OperationError> {
@@ -55,10 +51,10 @@ impl FieldElement {
     }
 
     // FIPS 203 (DRAFT), Definition 4.5.
-    // REMARKS:
-    // parameterize du and dv
-    pub fn compress<P: ParameterSet>(&self, d: u8) -> u16 {
-        let dividend = (self.val as u64).wrapping_shl(d.into());
+    // TODO: sometimes these might need to be called with
+    // values of du/dv that are different from param defs
+    pub fn compress<P: ParameterSet>(&self) -> u16 {
+        let dividend = (self.val as u64).wrapping_shl(P::Du.into());
         let quotient = dividend
             .wrapping_mul(bar_mul.into())
             .wrapping_shr(bar_shift as u32);
@@ -70,16 +66,16 @@ impl FieldElement {
         if remainder > (Q + Q / 2).into() {
             adjusted_quotient = adjusted_quotient.wrapping_add(1);
         }
-        let mask = (1u64 << d) - 1;
+        let mask = (1u64 << P::Du) - 1;
         (adjusted_quotient & mask) as u16
     }
 
     /// FIPS 203 (DRAFT), Definition 4.6
-    pub fn decompress<P: ParameterSet>(&self, d: u8) -> u16 {
+    pub fn decompress<P: ParameterSet>(&self) -> u16 {
         let dividend = self.val as u32;
         let dividend = dividend.wrapping_mul(Q.into());
-        let mut quotient = dividend.wrapping_shr(d.into());
-        quotient = quotient.wrapping_add((dividend.wrapping_shr((d - 1).into())) & 1);
+        let mut quotient = dividend.wrapping_shr(P::Dv.into());
+        quotient = quotient.wrapping_add((dividend.wrapping_shr(P::Dv as u32 - 1)) & 1);
         quotient as u16
     }
 
@@ -108,7 +104,6 @@ impl Mul<u16> for FieldElement {
     type Output = Self;
 
     fn mul(self, other: u16) -> Self {
-        // Perform multiplication in a larger integer type to handle overflow
         let product = (self.val as u32) * (other as u32);
         Self::barrett_reduce(product)
     }
@@ -118,7 +113,6 @@ impl Mul<FieldElement> for u16 {
     type Output = Self;
 
     fn mul(self, other: FieldElement) -> Self {
-        // Perform multiplication in a larger integer type to handle overflow
         let product = (other.val as u32) * (self as u32);
         FieldElement::barrett_reduce(product).val
     }
@@ -128,7 +122,6 @@ impl Mul<FieldElement> for FieldElement {
     type Output = Self;
 
     fn mul(self, other: FieldElement) -> Self {
-        // Perform multiplication in a larger integer type to handle overflow
         let product = (other.val as u32) * (self.val as u32);
         FieldElement::barrett_reduce(product)
     }
@@ -242,7 +235,6 @@ mod tests {
     // Test that verifies compression into a range with d = 10, where q is assumed to be 3329.
     #[test]
     fn test_compress() {
-        let d = 10; // Example bit width
         let test_cases = vec![
             // (input value, expected compressed output)
             (0, 0),      // A value that maps directly to 0
@@ -252,7 +244,7 @@ mod tests {
 
         for (val, expected) in test_cases {
             let fe = FieldElement { val };
-            let compressed = fe.compress::<P768>(d);
+            let compressed = fe.compress::<P768>();
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
@@ -260,17 +252,16 @@ mod tests {
     // Test that verifies compression into a range with d = 10, where q is assumed to be 3329.
     #[test]
     fn test_decompress() {
-        let d = 10; // Example bit width
         let test_cases = vec![
             // (input value, expected compressed output)
             (0, 0),        // A value that maps directly to 0
-            (1664, 5410),  // A value around q/2 should map near the middle of the range
-            (3328, 10819), // A value around q should map to the upper end of the range
+            (1664, 18536), // A value around q/2 should map near the middle of the range
+            (3328, 37072), // A value around q should map to the upper end of the range
         ];
 
         for (val, expected) in test_cases {
             let fe = FieldElement { val };
-            let compressed = fe.decompress::<P768>(d);
+            let compressed = fe.decompress::<P768>();
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
@@ -278,29 +269,10 @@ mod tests {
     #[test]
     fn test_compress_with_mask() {
         let fe = FieldElement { val: 12345 };
-        let compressed = fe.compress::<P768>(10);
+        let compressed = fe.compress::<P768>();
         assert!(
             compressed < 1024,
             "Compressed value should be within the mask limit"
         );
-    }
-
-    #[test]
-    fn test_decompress_then_compress() {
-        let d = 10;
-        // Example original values within the range of 0 to 2^d - 1
-        let original_values = vec![0, 1, 1023];
-
-        for &original in &original_values {
-            let fe = FieldElement::new(original);
-            let decompressed = fe.decompress::<P768>(d);
-            let decompressed_fe = FieldElement::new(decompressed);
-            let compressed = decompressed_fe.compress::<P768>(d);
-            assert_eq!(
-                compressed, original,
-                "Original value: {}, Decompressed then Compressed value: {}",
-                original, compressed
-            );
-        }
     }
 }

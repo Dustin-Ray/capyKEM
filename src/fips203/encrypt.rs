@@ -1,19 +1,12 @@
-use rand::{Rng, SeedableRng};
-use rand_chacha::ChaCha20Rng;
-use sha3::{
-    digest::{ExtendableOutput, Update, XofReader},
-    Shake256,
-};
-
 use crate::{
     constants::parameter_sets::ParameterSet,
     math::{ntt::NttElement, ring_element::RingElement},
     Message,
 };
 
-impl Message {
-    fn k_pke_encrypt<P: ParameterSet>(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
-        let k = self.k as usize;
+impl<P: ParameterSet> Message<P> {
+    fn k_pke_encrypt(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
+        let k = P::K as usize;
         let mut n = 0;
         let t_hat = RingElement::from(&ek_pke[0..384 * k]);
         let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
