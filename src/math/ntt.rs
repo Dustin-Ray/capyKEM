@@ -11,11 +11,11 @@ use sha3::{
 
 #[derive(Clone, Copy)]
 pub struct NttElement<P> {
-    ring: [F<P>; 256],
+    pub ring: [F<P>; 256],
 }
 
 impl<P: ParameterSet + Copy> NttElement<P> {
-    fn new(r: &mut RingElement<P>) -> Self {
+    pub fn new(r: &mut RingElement<P>) -> Self {
         let mut ntt_el = NttElement {
             ring: r.coefficients,
         };
@@ -114,7 +114,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
     }
 
     // This should only be used when converting to Rq
-    fn ntt_inv(&mut self) -> RingElement<P> {
+    pub fn ntt_inv(&mut self) -> RingElement<P> {
         let mut k = 127;
         let mut len = 2;
         while len <= 128 {

@@ -4,9 +4,12 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
 
     extern crate alloc;
+    use crate::{
+        constants::{parameter_sets::P768, sample_ntt_result},
+        math::{field_element::FieldElement as F, ntt::NttElement, ring_element::RingElement},
+    };
     use alloc::vec::Vec;
-    use crate::constants::parameter_sets::P768;
-    
+
     // REMARKS:
     // axiom tests:
     // -[ ] commutative
@@ -18,7 +21,7 @@ mod tests {
     #[test]
     fn test_sample_ntt() {
         let byte_stream = [0_u8; 0];
-        let a = NttElement::sample_ntt(&byte_stream, 0, 1);
+        let a: NttElement<P768> = NttElement::sample_ntt(&byte_stream, 0, 1);
         assert_eq!(a.ring, sample_ntt_result.map(|val| F::new(val)));
     }
 
