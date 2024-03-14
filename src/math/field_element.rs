@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use core::num::TryFromIntError;
 use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 
 use crate::constants::ml_kem_constants::Q;
@@ -56,11 +57,11 @@ impl<P: ParameterSet> FieldElement<P> {
     // FIPS 203 (DRAFT), Definition 4.5.
     // TODO: sometimes these might need to be called with
     // values of du/dv that are different from param defs
-    pub fn compress(&self) -> u16 {
-        let dividend = (self.val as u64).wrapping_shl(P::Du.into());
+    pub fn compress(&self) -> Result<u16, TryFromIntError> {
+        let dividend = u64::from(self.val).wrapping_shl(P::Du.into());
         let quotient = dividend
             .wrapping_mul(bar_mul.into())
-            .wrapping_shr(bar_shift as u32);
+            .wrapping_shr(u32::from(bar_shift));
         let remainder = dividend.wrapping_sub(quotient.wrapping_mul(Q.into()));
         let mut adjusted_quotient = quotient;
         if remainder > (Q / 2).into() {
@@ -70,21 +71,21 @@ impl<P: ParameterSet> FieldElement<P> {
             adjusted_quotient = adjusted_quotient.wrapping_add(1);
         }
         let mask = (1u64 << P::Du) - 1;
-        (adjusted_quotient & mask) as u16
+        u16::try_from(adjusted_quotient & mask)
     }
 
     /// FIPS 203 (DRAFT), Definition 4.6
     pub fn decompress(&self) -> u16 {
-        let dividend = self.val as u32;
+        let dividend = u32::from(self.val);
         let dividend = dividend.wrapping_mul(Q.into());
         let mut quotient = dividend.wrapping_shr(P::Dv.into());
-        quotient = quotient.wrapping_add((dividend.wrapping_shr(P::Dv as u32 - 1)) & 1);
+        quotient = quotient.wrapping_add((dividend.wrapping_shr(u32::from(P::Dv) - 1)) & 1);
         quotient as u16
     }
 
     fn barrett_reduce(product: u32) -> Self {
-        let quotient: u32 = ((product as u64 * bar_mul as u64) >> bar_shift) as u32;
-        Self::new((product - quotient * Q as u32) as u16)
+        let quotient: u32 = ((u64::from(product) * u64::from(bar_mul)) >> bar_shift) as u32;
+        Self::new((product - quotient * u32::from(Q)) as u16)
     }
 }
 
@@ -107,7 +108,7 @@ impl<P: ParameterSet> Mul<u16> for FieldElement<P> {
     type Output = Self;
 
     fn mul(self, other: u16) -> Self {
-        let product = (self.val as u32) * (other as u32);
+        let product = u32::from(self.val) * u32::from(other);
         Self::barrett_reduce(product)
     }
 }
@@ -116,7 +117,7 @@ impl<P: ParameterSet> Mul<FieldElement<P>> for u16 {
     type Output = Self;
 
     fn mul(self, other: FieldElement<P>) -> Self {
-        let product = (other.val as u32) * (self as u32);
+        let product = u32::from(other.val) * u32::from(self);
         FieldElement::<P>::barrett_reduce(product).val
     }
 }
@@ -125,7 +126,7 @@ impl<P: ParameterSet> Mul<FieldElement<P>> for FieldElement<P> {
     type Output = Self;
 
     fn mul(self, other: FieldElement<P>) -> Self {
-        let product = (other.val as u32) * (self.val as u32);
+        let product = u32::from(other.val) * u32::from(self.val);
         FieldElement::barrett_reduce(product)
     }
 }
@@ -264,7 +265,12 @@ mod tests {
                 _marker: PhantomData,
             };
             let compressed = fe.compress();
-            assert_eq!(compressed, expected, "Compression of {} failed", val);
+            assert_eq!(
+                compressed,
+                core::prelude::v1::Ok(expected),
+                "Compression of {} failed",
+                val
+            );
         }
     }
 
@@ -297,7 +303,7 @@ mod tests {
         };
         let compressed = fe.compress();
         assert!(
-            compressed < 1024,
+            compressed.unwrap() < 1024,
             "Compressed value should be within the mask limit"
         );
     }

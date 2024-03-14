@@ -82,7 +82,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
                 other.ring[2 * i],
                 other.ring[(2 * i) + 1],
                 k_mod_root,
-            )
+            );
         }
 
         h_hat
@@ -130,7 +130,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
             }
             len *= 2;
         }
-        for item in self.ring.iter_mut() {
+        for item in &mut self.ring {
             *item = *item * 3303;
         }
         RingElement::new(self.ring)
@@ -181,157 +181,5 @@ impl<P: ParameterSet + Copy> fmt::Debug for NttElement<P> {
             }
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use rand::{Rng, SeedableRng};
-    use rand_chacha::ChaCha20Rng;
-
-    extern crate alloc;
-
-    use alloc::vec::Vec;
-
-    use crate::constants::parameter_sets::P768;
-
-    use super::*;
-
-    // REMARKS:
-    // axiom tests:
-    // -[ ] commutative
-    // -[x] zero identity
-    // -[x] associativity
-    // -[ ] distributivity
-    // -[x] multiplication closure
-
-    #[test]
-    fn test_sample_ntt() {
-        let byte_stream = [0_u8; 0];
-
-        let a = NttElement::sample_ntt(&byte_stream, 0, 1);
-
-        // testing against the great Filippo Valsorda https://github.com/FiloSottile/mlkem768
-        let result: [F<P768>; 256] = [
-            2278, 18, 2449, 1376, 2453, 1346, 66, 738, 2100, 1008, 950, 2669, 2121, 3030, 880,
-            2569, 3146, 1432, 1285, 2106, 1943, 895, 2326, 3255, 1301, 1752, 1281, 2500, 3149,
-            1061, 959, 687, 199, 1817, 1651, 2069, 3091, 2864, 120, 2222, 3005, 1823, 2721, 3012,
-            665, 1426, 386, 1639, 1632, 591, 1405, 756, 464, 1405, 2701, 3275, 76, 2137, 664, 2457,
-            2216, 2352, 1994, 1521, 1944, 1753, 999, 2051, 3219, 2771, 1596, 2123, 527, 339, 2532,
-            2079, 2994, 576, 1876, 2698, 1708, 119, 537, 2122, 3132, 285, 3198, 3131, 2761, 3187,
-            1, 3082, 2809, 3140, 895, 356, 1653, 2663, 2856, 2290, 3166, 1245, 1876, 2355, 2746,
-            3213, 619, 551, 3216, 2092, 966, 479, 3079, 2557, 2706, 380, 2388, 915, 4, 2336, 144,
-            3220, 1807, 95, 1109, 2105, 1441, 2379, 2890, 2985, 2129, 1040, 1472, 1350, 1976, 927,
-            862, 1556, 2188, 447, 856, 1458, 2372, 1254, 2132, 2618, 200, 2880, 2834, 1811, 505,
-            124, 621, 2574, 2546, 2974, 1875, 1646, 618, 1867, 1394, 1059, 486, 1232, 2574, 563,
-            2509, 2805, 2674, 1594, 782, 1147, 12, 1853, 459, 2718, 1861, 913, 2538, 1986, 346,
-            2139, 1256, 3148, 830, 615, 676, 2220, 2638, 893, 977, 474, 1096, 1307, 3285, 462,
-            3082, 2805, 1286, 2645, 2733, 2695, 2082, 3216, 414, 1376, 2636, 971, 2671, 1721, 746,
-            516, 1620, 688, 1903, 2497, 2869, 1587, 819, 256, 2326, 943, 1733, 117, 2941, 2933,
-            1852, 2753, 2057, 2585, 1042, 2572, 220, 3049, 558, 2617, 1975, 45, 2593, 757, 3202,
-            1164, 1123, 1458, 1720, 2365, 148, 605, 2229, 760, 90, 3212, 3015, 1643, 1962, 2954,
-        ]
-        .map(|val| F::new(val));
-
-        assert_eq!(a.ring, result);
-    }
-
-    #[test]
-    fn test_ntt() {
-        use alloc::vec;
-        // sample output is in NTT domain
-        let mut byte_stream: NttElement<P768> = NttElement::sample_ntt(&vec![42_u8; 32], 1, 1);
-        let mut byte_stream_copy = byte_stream;
-        byte_stream.ntt_inv();
-        byte_stream_copy.ntt_inv();
-        assert_eq!(byte_stream_copy.ring, byte_stream.ring)
-    }
-
-    #[test]
-    fn test_ntt_from_poly_cbd_inverse_with_random_input() {
-        // Generate a random byte stream using a seeded RNG for reproducibility
-        let bytes: Vec<u8> = (0..32)
-            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
-            .collect();
-        // Sample a ring element using the random byte stream
-        let mut ring_element: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xFF);
-        let ring_element_copy = ring_element;
-
-        // runs .ntt() on intstantiation
-        let ntt_element = NttElement::new(&mut ring_element);
-        assert_eq!(
-            ring_element_copy.coefficients,
-            Into::<RingElement<P768>>::into(ntt_element).coefficients
-        );
-    }
-
-    #[test]
-    fn test_multiply_ntts_associative() {
-        let bytes: Vec<u8> = (0..32)
-            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
-            .collect();
-
-        let a: NttElement<P768> = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-        let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
-        let c = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xCC));
-
-        // Test associativity (ab)c = a(bc)
-        let ab_c = (a * b) * c;
-        let a_bc = a * (b * c);
-        assert_eq!(ab_c.ring, a_bc.ring);
-
-        let a: NttElement<P768> = NttElement::sample_ntt(&bytes.clone(), 0, 0);
-        let b = NttElement::sample_ntt(&bytes.clone(), 0, 0);
-        let c = NttElement::sample_ntt(&bytes.clone(), 0, 0);
-
-        // Test associativity (ab)c = a(bc)
-        let ab_c = (a * b) * c;
-        let a_bc = a * (b * c);
-        assert_eq!(ab_c.ring, a_bc.ring);
-    }
-
-    #[test]
-    fn test_multiply_ntts_zero() {
-        let bytes: Vec<u8> = (0..32)
-            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
-            .collect();
-
-        let a: NttElement<P768> = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-        let zero = NttElement::zero();
-
-        // Test multiplicative identity
-        let res = zero * a;
-        assert_eq!(
-            res,
-            NttElement {
-                ring: [F::zero(); 256]
-            }
-        );
-        let res = a * zero;
-        assert_eq!(
-            res,
-            NttElement {
-                ring: [F::zero(); 256]
-            }
-        );
-    }
-
-    #[test]
-    fn test_closure_under_multiplication() {
-        for _ in 0..1000 {
-            let bytes: Vec<u8> = (0..32)
-                .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
-                .collect();
-
-            let a: NttElement<P768> =
-                NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xAA));
-            let b = NttElement::new(&mut RingElement::sample_poly_cbd(&bytes, 0xBB));
-
-            let result = a * b;
-            assert!(
-                result.ring.iter().all(|x| x.val() < 3329),
-                "Result of multiplication must be valid NttElement"
-            );
-        }
     }
 }

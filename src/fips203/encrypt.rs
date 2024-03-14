@@ -46,7 +46,7 @@ impl<P: ParameterSet + core::marker::Copy> Message<P> {
             u[i] = e_1[i];
             for j in 0..r.len() {
                 // Is addition happening in NTT domain as well?
-                u[i] += (a_hat[i * k + j] * r_hat[j]).into() // into ring = NTT^(-1)
+                u[i] += (a_hat[i * k + j] * r_hat[j]).into(); // into ring = NTT^(-1)
             }
         }
 

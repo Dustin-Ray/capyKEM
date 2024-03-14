@@ -60,7 +60,7 @@ impl<P: ParameterSet + Copy> Message<P> {
             t[i] = e[i];
             for j in 0..s.len() {
                 // Is addition happening in NTT domain as well?
-                t[i] += a_hat[i * k + j] * s[j] // This accounts for FIPS 203 revision and will likely change
+                t[i] += a_hat[i * k + j] * s[j]; // This accounts for FIPS 203 revision and will likely change
             }
         }
 
@@ -93,7 +93,7 @@ mod tests {
     };
 
     #[test]
-    fn test_instantiate_over_parameter_sets() {
+    fn smoke_test_instantiate_over_parameter_sets() {
         let m_512: Message<P512> = Message::new([0_u8; 32]);
         let (ek, dk) = m_512.k_pke_keygen();
 
