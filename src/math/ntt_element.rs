@@ -135,6 +135,23 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         }
         RingElement::new(self.ring)
     }
+
+    // REMARKS:
+    // make generic for NTT and Ring
+    pub fn byte_encode(self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(256 * 12 / 8);
+
+        for i in (0..self.ring.len()).step_by(2) {
+            // Combine two 12-bit integers into a single 24-bit integer
+            let x = u32::from(self.ring[i].val()) | (u32::from(self.ring[i + 1].val()) << 12);
+
+            // Split the 24-bit integer into 3 bytes and append to the output vector
+            out.push((x & 0xFF) as u8); // First 8 bits
+            out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
+            out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
+        }
+        out
+    }
 }
 
 impl<P: ParameterSet + Copy> AddAssign for NttElement<P> {
@@ -174,9 +191,10 @@ impl<P: ParameterSet + Copy> Mul<NttElement<P>> for NttElement<P> {
 impl<P: ParameterSet + Copy> fmt::Debug for NttElement<P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.ring.iter().enumerate() {
+            // adjust for spacing between rows
             write!(f, "{:<8}", element.val())?;
-            // Adjust for row width
-            if (index + 1) % 16 == 0 {
+            // Adjust for modulus for row width
+            if (index + 1) % 8 == 0 {
                 writeln!(f)?;
             }
         }

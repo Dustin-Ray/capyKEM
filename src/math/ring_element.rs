@@ -31,7 +31,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
     }
 
     // REMARKS:
-    // TODO: parameterize du and dv
+    // make generic for NTT and Ring
     pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
@@ -48,10 +48,10 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         out
     }
 
-    pub fn byte_decode(b: &[u8]) -> Result<Self, &'static str> {
+    pub fn byte_decode(b: &[u8]) -> Result<Self, String> {
         const MASK_12: u32 = 0b1111_1111_1111;
         if b.len() != ml_kem_constants::ENCODE_SIZE_12.into() {
-            return Err("Invalid encoding length");
+            return Err("Invalid encoding length".to_owned());
         }
 
         let mut f = Vec::with_capacity(N.into());

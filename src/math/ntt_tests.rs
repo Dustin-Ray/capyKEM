@@ -6,7 +6,7 @@ mod tests {
     extern crate alloc;
     use crate::{
         constants::{parameter_sets::P768, sample_ntt_result},
-        math::{field_element::FieldElement as F, ntt::NttElement, ring_element::RingElement},
+        math::{field_element::FieldElement as F, ntt_element::NttElement, ring_element::RingElement},
     };
     use alloc::vec::Vec;
 

@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 
 use crate::{
     constants::parameter_sets::ParameterSet,
-    math::{ntt::NttElement, ring_element::RingElement},
+    math::{ntt_element::NttElement, ring_element::RingElement},
     Message,
 };
 

@@ -1,7 +1,7 @@
 #[allow(dead_code)]
-mod field_element;
+pub mod field_element;
 #[allow(dead_code)]
-pub mod ntt;
+pub mod ntt_element;
 mod ntt_tests;
 #[allow(dead_code)]
 pub mod ring_element;

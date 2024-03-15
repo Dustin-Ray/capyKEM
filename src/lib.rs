@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 extern crate alloc;
 use constants::parameter_sets::ParameterSet;
 use core::marker::PhantomData;
@@ -9,12 +9,13 @@ mod constants;
 #[allow(dead_code)]
 mod fips203;
 #[allow(dead_code)]
-mod math;
+pub mod math;
 
 /// A container for the 32-byte shared secret key
 /// that will be exchanged via encapsulation/decapsulation.
 /// It is defined over generic parameter set defined
 /// by NIST of various security levels.
+#[derive(Debug)]
 pub struct Message<P> {
     pub m: [u8; 32],
     _marker: PhantomData<P>,
