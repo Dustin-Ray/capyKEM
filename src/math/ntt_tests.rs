@@ -125,4 +125,52 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_encode_decode() {
+        // Initialize a CRNG
+        let bytes: Vec<u8> = (0..384)
+            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
+            .collect();
+
+        // Initialize a RingElement with random values
+        let a: NttElement<P768> = NttElement::sample_ntt(&bytes, 1, 1);
+
+        // Encode the RingElement to bytes
+        let encoded_bytes = {
+            let mut out = Vec::with_capacity(256 * 12 / 8);
+
+            for i in (0..a.coefficients.len()).step_by(2) {
+                // Combine two 12-bit integers into a single 24-bit integer
+                let x = u32::from(a.coefficients[i].val())
+                    | (u32::from(a.coefficients[i + 1].val()) << 12);
+
+                // Split the 24-bit integer into 3 bytes and append to the output vector
+                out.push((x & 0xFF) as u8); // First 8 bits
+                out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
+                out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
+            }
+            out
+        };
+
+        // Decode the bytes back into a vector of F
+        let decoded_elements: NttElement<P768> =
+            NttElement::poly_byte_decode(&encoded_bytes).expect("Decoding failed");
+
+        // Verify the decoded vector matches the original RingElement's array
+        assert_eq!(
+            decoded_elements.coefficients.len(),
+            a.coefficients.len(),
+            "Length mismatch"
+        );
+
+        // Check each value for equality after encoding and decoding
+        for (decoded_elem, original_elem) in decoded_elements
+            .coefficients
+            .iter()
+            .zip(a.coefficients.iter())
+        {
+            assert_eq!(decoded_elem.val(), original_elem.val(), "Value mismatch");
+        }
+    }
 }

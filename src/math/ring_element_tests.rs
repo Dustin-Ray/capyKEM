@@ -107,37 +107,4 @@ mod tests {
         let zero = RingElement::zero(); // The additive identity
         assert_eq!(result, zero, "a + additive inverse of a should be zero.");
     }
-    #[test]
-    fn test_encode_decode() {
-        // Initialize a CRNG
-        let bytes: Vec<u8> = (0..32)
-            .map(|_| ChaCha20Rng::seed_from_u64(0x7FFFFFFFFFFFFFFF).gen())
-            .collect();
-
-        // Initialize a RingElement with random values
-        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0xAA);
-
-        // Encode the RingElement to bytes
-        let encoded_bytes = a.byte_encode();
-
-        // Decode the bytes back into a vector of F
-        let decoded_elements: RingElement<P768> =
-            RingElement::poly_byte_decode(&encoded_bytes).expect("Decoding failed");
-
-        // Verify the decoded vector matches the original RingElement's array
-        assert_eq!(
-            decoded_elements.coefficients.len(),
-            a.coefficients.len(),
-            "Length mismatch"
-        );
-
-        // Check each value for equality after encoding and decoding
-        for (decoded_elem, original_elem) in decoded_elements
-            .coefficients
-            .iter()
-            .zip(a.coefficients.iter())
-        {
-            assert_eq!(decoded_elem.val(), original_elem.val(), "Value mismatch");
-        }
-    }
 }

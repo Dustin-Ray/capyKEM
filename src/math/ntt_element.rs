@@ -139,7 +139,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
 
     // REMARKS:
     // make generic for NTT and Ring
-    pub fn byte_encode(self) -> Vec<u8> {
+    pub fn poly_byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8);
 
         for i in (0..self.coefficients.len()).step_by(2) {
@@ -179,7 +179,6 @@ impl<P: ParameterSet + Copy> NttElement<P> {
 
             i += 3;
         }
-        dbg!(f.len());
         let coefficients: [F<P>; 256] = f
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;

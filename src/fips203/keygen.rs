@@ -61,7 +61,22 @@ impl<P: ParameterSet + Copy> Secret<P> {
             .iter_mut()
             .take(k)
             .flat_map(|t_elem| {
-                let mut bytes = (*t_elem).byte_encode();
+                let mut bytes = {
+                    let this = *t_elem;
+                    let mut out = Vec::with_capacity(256 * 12 / 8);
+
+                    for i in (0..this.coefficients.len()).step_by(2) {
+                        // Combine two 12-bit integers into a single 24-bit integer
+                        let x = u32::from(this.coefficients[i].val())
+                            | (u32::from(this.coefficients[i + 1].val()) << 12);
+
+                        // Split the 24-bit integer into 3 bytes and append to the output vector
+                        out.push((x & 0xFF) as u8); // First 8 bits
+                        out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
+                        out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
+                    }
+                    out
+                };
                 bytes.extend_from_slice(rho);
                 bytes
             })
@@ -70,7 +85,22 @@ impl<P: ParameterSet + Copy> Secret<P> {
         let dk_pke: Vec<u8> = s_hat
             .iter_mut()
             .take(k)
-            .flat_map(|s_elem: &mut NttElement<P>| (*s_elem).byte_encode())
+            .flat_map(|s_elem: &mut NttElement<P>| {
+                let this = *s_elem;
+                let mut out = Vec::with_capacity(256 * 12 / 8);
+
+                for i in (0..this.coefficients.len()).step_by(2) {
+                    // Combine two 12-bit integers into a single 24-bit integer
+                    let x = u32::from(this.coefficients[i].val())
+                        | (u32::from(this.coefficients[i + 1].val()) << 12);
+
+                    // Split the 24-bit integer into 3 bytes and append to the output vector
+                    out.push((x & 0xFF) as u8); // First 8 bits
+                    out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
+                    out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
+                }
+                out
+            })
             .collect();
 
         (ek_pke, dk_pke)

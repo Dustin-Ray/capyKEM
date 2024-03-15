@@ -9,7 +9,7 @@ use sha3::{
 
 use alloc::vec::Vec;
 
-use crate::constants::ml_kem_constants::{self, N};
+use crate::constants::ml_kem_constants::N;
 use crate::constants::parameter_sets::ParameterSet;
 use crate::math::field_element::FieldElement as F;
 
@@ -46,38 +46,6 @@ impl<P: ParameterSet + Copy> RingElement<P> {
             out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
         }
         out
-    }
-
-    pub fn poly_byte_decode(b: &[u8]) -> Result<Self, String> {
-        const MASK_12: u32 = 0b1111_1111_1111;
-        if b.len() != (ml_kem_constants::ENCODE_SIZE_12 * P::K).into() {
-            return Err("Invalid encoding length".to_owned());
-        }
-
-        let mut f = Vec::with_capacity(N.into());
-
-        let mut i = 0;
-        while i < b.len() {
-            let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
-            let elem1 = F::new((d & MASK_12) as u16)
-                .check_reduced()
-                .map_err(|_| "Invalid polynomial encoding")?;
-
-            let elem2 = F::new((d >> 12) as u16)
-                .check_reduced()
-                .map_err(|_| "Invalid polynomial encoding")?;
-
-            f.push(elem1);
-            f.push(elem2);
-
-            i += 3;
-        }
-        dbg!(f.len());
-        let coefficients: [F<P>; 256] = f
-            .try_into()
-            .map_err(|_| "Conversion to fixed-size array failed")?;
-
-        Ok(RingElement { coefficients })
     }
 
     // REMARKS:
@@ -120,7 +88,7 @@ impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
         for (index, element) in self.coefficients.iter().enumerate() {
             write!(f, "{:<8}", element.val())?;
             // Adjust for row width
-            if (index + 1) % 16 == 0 {
+            if (index + 1) % 8 == 0 {
                 writeln!(f)?;
             }
         }
@@ -131,12 +99,6 @@ impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
 impl<P: ParameterSet + Copy> From<[F<P>; 256]> for RingElement<P> {
     fn from(val: [F<P>; 256]) -> Self {
         RingElement::new(val)
-    }
-}
-
-impl<P: ParameterSet + Copy> From<&[u8]> for RingElement<P> {
-    fn from(slice: &[u8]) -> Self {
-        RingElement::poly_byte_decode(slice).expect("failed to decode bytes, check reduction?")
     }
 }
 

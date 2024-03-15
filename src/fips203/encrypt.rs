@@ -8,7 +8,7 @@ use crate::{
 };
 
 impl<P: ParameterSet + Copy> Secret<P> {
-    fn k_pke_encrypt(&self, ek_pke: &[u8], r: &[u8; 32]) -> Vec<u8> {
+    fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
         let k = P::K as usize;
         let mut n = 0;
         // handle this error
@@ -37,24 +37,28 @@ impl<P: ParameterSet + Copy> Secret<P> {
         // generate r, run ntt k times
         let mut r_hat = vec![NttElement::<P>::zero(); k];
         for r_elem in r_hat.iter_mut().take(k) {
-            *r_elem = RingElement::sample_poly_cbd(r, n).into();
+            *r_elem = RingElement::sample_poly_cbd(rand, n).into();
             n += 1;
         }
 
         // generate e1
         let mut e_1 = vec![RingElement::<P>::zero(); k];
         for e_elem in e_1.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd(r, n);
+            *e_elem = RingElement::sample_poly_cbd(rand, n);
             n += 1;
         }
 
         // sample e2
-        let e2: RingElement<P> = RingElement::sample_poly_cbd(r, n);
-        dbg!(e2);
+        let e2: RingElement<P> = RingElement::sample_poly_cbd(rand, n);
 
-        // let mu = RingElement::byte_decode(&self.m).d;
-        // TODO: NEED compress and decompress for ring
-
+        let mut u = vec![RingElement::zero(); k];
+        for i in 0..k {
+            u[i] = e_1[i];
+            for j in 0..k {
+                u[i] += (a_hat_transpose[i * k + j] * r_hat[j]).into(); // into ring = NTT^(-1)
+            }
+        }
+        println!("{:?}", u);
         vec![]
     }
 }
@@ -70,9 +74,8 @@ mod tests {
                 println!();
             }
         }
-        // Handle the case where the Vec doesn't end exactly at a row boundary
         if !vec.is_empty() && vec.len() % 16 != 0 {
-            println!(); // Ensure there's a newline at the end if needed
+            println!();
         }
     }
 
