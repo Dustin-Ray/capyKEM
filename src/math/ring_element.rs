@@ -48,13 +48,14 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         out
     }
 
-    pub fn byte_decode(b: &[u8]) -> Result<Self, String> {
+    pub fn poly_byte_decode(b: &[u8]) -> Result<Self, String> {
         const MASK_12: u32 = 0b1111_1111_1111;
-        if b.len() != ml_kem_constants::ENCODE_SIZE_12.into() {
+        if b.len() != (ml_kem_constants::ENCODE_SIZE_12 * P::K).into() {
             return Err("Invalid encoding length".to_owned());
         }
 
         let mut f = Vec::with_capacity(N.into());
+
         let mut i = 0;
         while i < b.len() {
             let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
@@ -71,11 +72,12 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
             i += 3;
         }
-        let array: [F<P>; 256] = f
+        dbg!(f.len());
+        let coefficients: [F<P>; 256] = f
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;
 
-        Ok(RingElement::new(array))
+        Ok(RingElement { coefficients })
     }
 
     // REMARKS:
@@ -134,7 +136,7 @@ impl<P: ParameterSet + Copy> From<[F<P>; 256]> for RingElement<P> {
 
 impl<P: ParameterSet + Copy> From<&[u8]> for RingElement<P> {
     fn from(slice: &[u8]) -> Self {
-        RingElement::byte_decode(slice).expect("failed to decode bytes, check reduction?")
+        RingElement::poly_byte_decode(slice).expect("failed to decode bytes, check reduction?")
     }
 }
 

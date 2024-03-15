@@ -16,15 +16,15 @@ pub mod math;
 /// It is defined over generic parameter set defined
 /// by NIST of various security levels.
 #[derive(Debug)]
-pub struct Message<P> {
+pub struct Secret<P> {
     pub m: [u8; 32],
     _marker: PhantomData<P>,
 }
 
-impl<P: ParameterSet> Message<P> {
+impl<P: ParameterSet> Secret<P> {
     #[must_use]
     pub fn new(data: [u8; 32]) -> Self {
-        Message::<P> {
+        Secret::<P> {
             m: data,
             _marker: PhantomData,
         }

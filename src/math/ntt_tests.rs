@@ -6,7 +6,9 @@ mod tests {
     extern crate alloc;
     use crate::{
         constants::{parameter_sets::P768, sample_ntt_result},
-        math::{field_element::FieldElement as F, ntt_element::NttElement, ring_element::RingElement},
+        math::{
+            field_element::FieldElement as F, ntt_element::NttElement, ring_element::RingElement,
+        },
     };
     use alloc::vec::Vec;
 
@@ -22,7 +24,7 @@ mod tests {
     fn test_sample_ntt() {
         let byte_stream = [0_u8; 0];
         let a: NttElement<P768> = NttElement::sample_ntt(&byte_stream, 0, 1);
-        assert_eq!(a.ring, sample_ntt_result.map(|val| F::new(val)));
+        assert_eq!(a.coefficients, sample_ntt_result.map(|val| F::new(val)));
     }
 
     #[test]
@@ -33,7 +35,7 @@ mod tests {
         let mut byte_stream_copy = byte_stream;
         byte_stream.ntt_inv();
         byte_stream_copy.ntt_inv();
-        assert_eq!(byte_stream_copy.ring, byte_stream.ring)
+        assert_eq!(byte_stream_copy.coefficients, byte_stream.coefficients)
     }
 
     #[test]
@@ -67,7 +69,7 @@ mod tests {
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
         let a_bc = a * (b * c);
-        assert_eq!(ab_c.ring, a_bc.ring);
+        assert_eq!(ab_c.coefficients, a_bc.coefficients);
 
         let a: NttElement<P768> = NttElement::sample_ntt(&bytes.clone(), 0, 0);
         let b = NttElement::sample_ntt(&bytes.clone(), 0, 0);
@@ -76,7 +78,7 @@ mod tests {
         // Test associativity (ab)c = a(bc)
         let ab_c = (a * b) * c;
         let a_bc = a * (b * c);
-        assert_eq!(ab_c.ring, a_bc.ring);
+        assert_eq!(ab_c.coefficients, a_bc.coefficients);
     }
 
     #[test]
@@ -93,14 +95,14 @@ mod tests {
         assert_eq!(
             res,
             NttElement {
-                ring: [F::zero(); 256]
+                coefficients: [F::zero(); 256]
             }
         );
         let res = a * zero;
         assert_eq!(
             res,
             NttElement {
-                ring: [F::zero(); 256]
+                coefficients: [F::zero(); 256]
             }
         );
     }
@@ -118,7 +120,7 @@ mod tests {
 
             let result = a * b;
             assert!(
-                result.ring.iter().all(|x| x.val() < 3329),
+                result.coefficients.iter().all(|x| x.val() < 3329),
                 "Result of multiplication must be valid NttElement"
             );
         }

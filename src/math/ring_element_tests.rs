@@ -122,7 +122,7 @@ mod tests {
 
         // Decode the bytes back into a vector of F
         let decoded_elements: RingElement<P768> =
-            RingElement::byte_decode(&encoded_bytes).expect("Decoding failed");
+            RingElement::poly_byte_decode(&encoded_bytes).expect("Decoding failed");
 
         // Verify the decoded vector matches the original RingElement's array
         assert_eq!(
