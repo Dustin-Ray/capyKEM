@@ -1,8 +1,7 @@
 use core::marker::PhantomData;
-use core::num::TryFromIntError;
 use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 
-use crate::constants::ml_kem_constants::Q;
+use crate::constants::ml_kem_constants::q;
 use crate::constants::{
     barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
     parameter_sets::ParameterSet,
@@ -37,13 +36,13 @@ impl<P: ParameterSet> FieldElement<P> {
     }
 
     fn reduce_once(&mut self) {
-        let mut x = self.val.wrapping_sub(Q);
-        x = x.wrapping_add((x >> 15).wrapping_mul(Q));
+        let mut x = self.val.wrapping_sub(q);
+        x = x.wrapping_add((x >> 15).wrapping_mul(q));
         self.val = x;
     }
 
     pub fn check_reduced(self) -> Result<Self, OperationError> {
-        if self.val > Q {
+        if self.val > q {
             Err(OperationError::UnreducedFieldElementError)
         } else {
             Ok(self)
@@ -57,41 +56,41 @@ impl<P: ParameterSet> FieldElement<P> {
     // FIPS 203 (DRAFT), Definition 4.5.
     // TODO: sometimes these might need to be called with
     // values of du/dv that are different from param defs
-    pub fn compress(&self) -> Result<u16, TryFromIntError> {
-        let dividend = u64::from(self.val).wrapping_shl(P::Du.into());
+    pub fn compress<const d: u16>(&self) -> u16 {
+        let dividend = u64::from(self.val).wrapping_shl(d.into());
         let quotient = dividend
             .wrapping_mul(bar_mul.into())
             .wrapping_shr(u32::from(bar_shift));
-        let remainder = dividend.wrapping_sub(quotient.wrapping_mul(Q.into()));
+        let remainder = dividend.wrapping_sub(quotient.wrapping_mul(q.into()));
         let mut adjusted_quotient = quotient;
-        if remainder > (Q / 2).into() {
+        if remainder > (q / 2).into() {
             adjusted_quotient = adjusted_quotient.wrapping_add(1);
         }
-        if remainder > (Q + Q / 2).into() {
+        if remainder > (q + q / 2).into() {
             adjusted_quotient = adjusted_quotient.wrapping_add(1);
         }
-        let mask = (1u64 << P::Du) - 1;
-        u16::try_from(adjusted_quotient & mask)
+        let mask = (1u64 << d) - 1;
+        (adjusted_quotient & mask) as u16
     }
 
     /// FIPS 203 (DRAFT), Definition 4.6
-    pub fn decompress(&self) -> u16 {
+    pub fn decompress<const D: u16>(&self) -> u16 {
         let dividend = u32::from(self.val);
-        let dividend = dividend.wrapping_mul(Q.into());
-        let mut quotient = dividend.wrapping_shr(P::Dv.into());
-        quotient = quotient.wrapping_add((dividend.wrapping_shr(u32::from(P::Dv) - 1)) & 1);
+        let dividend = dividend.wrapping_mul(q.into());
+        let mut quotient = dividend.wrapping_shr(D.into());
+        quotient = quotient.wrapping_add((dividend.wrapping_shr(u32::from(D) - 1)) & 1);
         quotient as u16
     }
 
     fn barrett_reduce(product: u32) -> Self {
         let quotient: u32 = ((u64::from(product) * u64::from(bar_mul)) >> bar_shift) as u32;
-        Self::new((product - quotient * u32::from(Q)) as u16)
+        Self::new((product - quotient * u32::from(q)) as u16)
     }
 }
 
 impl<P: ParameterSet + Copy> AddAssign for FieldElement<P> {
     fn add_assign(&mut self, other: Self) {
-        self.val = (self.val + other.val) % Q;
+        self.val = (self.val + other.val) % q;
     }
 }
 
@@ -148,7 +147,7 @@ impl<P: ParameterSet> Sub for FieldElement<P> {
         // If `self.val` is less than `other.val`, adding `Q`
         // ensures the result stays positive and wraps around correctly.
         let result = if self.val < other.val {
-            self.val + Q - other.val
+            self.val + q - other.val
         } else {
             self.val - other.val
         };
@@ -161,7 +160,7 @@ mod tests {
     use core::marker::PhantomData;
 
     use crate::{
-        constants::{ml_kem_constants::Q, parameter_sets::P768},
+        constants::{ml_kem_constants::q, parameter_sets::P768},
         math::field_element::FieldElement as F,
     };
 
@@ -172,10 +171,10 @@ mod tests {
 
     #[test]
     fn exhaustive_test_reduce_once() {
-        for i in Q + 1..=2 * Q {
+        for i in q + 1..=2 * q {
             let element: F<P768> = F::new(i);
             assert!(
-                element.val <= Q,
+                element.val <= q,
                 "Value should be reduced within [0, Q] range for input: {i}, but got: {}",
                 element.val
             );
@@ -235,13 +234,13 @@ mod tests {
 
     #[test]
     fn test_check_reduced_ok() {
-        assert!(F::<P768>::new(Q - 1).check_reduced().is_ok());
+        assert!(F::<P768>::new(q - 1).check_reduced().is_ok());
     }
 
     #[test]
     fn test_check_reduced_err() {
         assert!(F {
-            val: Q + 1,
+            val: q + 1,
             _marker: PhantomData::<P768>
         }
         .check_reduced()
@@ -264,13 +263,8 @@ mod tests {
                 val,
                 _marker: PhantomData,
             };
-            let compressed = fe.compress();
-            assert_eq!(
-                compressed,
-                core::prelude::v1::Ok(expected),
-                "Compression of {} failed",
-                val
-            );
+            let compressed = fe.compress::<10>();
+            assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
 
@@ -290,7 +284,7 @@ mod tests {
                 val,
                 _marker: PhantomData,
             };
-            let compressed = fe.decompress();
+            let compressed = fe.decompress::<4>();
             assert_eq!(compressed, expected, "Compression of {} failed", val);
         }
     }
@@ -301,9 +295,9 @@ mod tests {
             val: 12345,
             _marker: PhantomData,
         };
-        let compressed = fe.compress();
+        let compressed = fe.compress::<10>();
         assert!(
-            compressed.unwrap() < 1024,
+            compressed < 1024,
             "Compressed value should be within the mask limit"
         );
     }

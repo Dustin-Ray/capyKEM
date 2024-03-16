@@ -1,13 +1,17 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
-use crate::constants::ml_kem_constants::{self, N, Q};
+use crate::constants::ml_kem_constants::{self, n, q};
 use crate::constants::parameter_sets::ParameterSet;
 use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
 use core::fmt;
+use core::ops::Add;
 use core::ops::{AddAssign, Mul};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
 };
+
+// TODO: define addition on NTT domain to save a transform?
+// or make addition generic for rings.
 
 #[derive(Clone, Copy)]
 pub struct NttElement<P> {
@@ -17,7 +21,7 @@ pub struct NttElement<P> {
 impl<P: ParameterSet + Copy> NttElement<P> {
     pub fn new(r: &mut RingElement<P>) -> Self {
         let mut ntt_el = NttElement {
-            coefficients: r.coefficients,
+            coefficients: r.coefs,
         };
         ntt_el.ntt();
         ntt_el
@@ -44,7 +48,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         let mut j = 0usize;
         let mut buf = [0u8; 24];
         let mut off = 24usize;
-        while j < N.into() {
+        while j < n.into() {
             if off >= 24 {
                 reader.read(&mut buf);
                 off = 0;
@@ -55,15 +59,15 @@ impl<P: ParameterSet + Copy> NttElement<P> {
 
             off += 3;
 
-            if d1 < Q {
+            if d1 < q {
                 a.coefficients[j] = F::new(d1);
                 j += 1;
             }
-            if j >= N.into() {
+            if j >= n.into() {
                 break;
             }
 
-            if d2 < Q {
+            if d2 < q {
                 a.coefficients[j] = F::new(d2);
                 j += 1;
             }
@@ -105,7 +109,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
                 k += 1;
 
                 for j in start..start + len {
-                    let t = zeta * self.coefficients[j + len] % Q;
+                    let t = zeta * self.coefficients[j + len] % q;
                     self.coefficients[j + len] = self.coefficients[j] - F::new(t);
                     self.coefficients[j] += F::new(t);
                 }
@@ -155,13 +159,13 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         out
     }
 
-    pub fn poly_byte_decode(b: &[u8]) -> Result<Self, String> {
+    pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
         const MASK_12: u32 = 0b1111_1111_1111;
         if b.len() != (ml_kem_constants::ENCODE_SIZE_12).into() {
             return Err("Invalid encoding length".to_owned());
         }
 
-        let mut f = Vec::with_capacity(N.into());
+        let mut f = Vec::with_capacity(n.into());
 
         let mut i = 0;
         while i < b.len() {
@@ -183,7 +187,25 @@ impl<P: ParameterSet + Copy> NttElement<P> {
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;
 
-        Ok(NttElement { coefficients })
+        Ok(Self { coefficients })
+    }
+}
+
+impl<P: ParameterSet + Copy> Add for NttElement<P> {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self::Output {
+        assert_eq!(
+            self.coefficients.len(),
+            other.coefficients.len(),
+            "RingElements must be of the same length"
+        );
+
+        let mut coefficients = [F::zero(); 256];
+        for (i, item) in self.coefficients.iter().enumerate().take(256) {
+            coefficients[i] = *item + other.coefficients[i];
+        }
+        NttElement { coefficients }
     }
 }
 

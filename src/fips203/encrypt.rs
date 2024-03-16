@@ -9,20 +9,20 @@ use crate::{
 
 impl<P: ParameterSet + Copy> Secret<P> {
     fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
-        let k = P::K as usize;
+        let k = P::k as usize;
         let mut n = 0;
         // handle this error
-        let mut t_hat = Vec::with_capacity(k);
-        let mut ek_slice = &ek_pke[..];
+        let mut t_hat: Vec<NttElement<P>> = Vec::with_capacity(k);
 
-        for _ in 0..k {
-            let decoded_element =
-                NttElement::<P>::poly_byte_decode(&ek_slice[0..384]).map_err(|err| err.to_string());
+        // Process each chunk of 384 bytes to decode it into an NttElement
+        // TODO: parameterize 384
+        let decoded_ek_pke: Result<Vec<_>, _> = ek_pke
+            .chunks_exact(384) // Create an iterator that yields slices of ek_pke in chunks of 384 bytes.
+            .take(k) // Ensure we only take k elements
+            .map(|chunk| NttElement::<P>::byte_decode_12(chunk).map_err(|e| e.to_string()))
+            .collect(); // Collect results into a vector, handling errors automatically.
 
-            // Append the decoded element to t
-            t_hat.push(decoded_element);
-            ek_slice = &ek_slice[384..];
-        }
+        t_hat.extend(decoded_ek_pke.unwrap());
 
         let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
 
@@ -51,21 +51,44 @@ impl<P: ParameterSet + Copy> Secret<P> {
         // sample e2
         let e2: RingElement<P> = RingElement::sample_poly_cbd(rand, n);
 
-        let mut u = vec![RingElement::zero(); k];
-        for i in 0..k {
-            u[i] = e_1[i];
-            for j in 0..k {
-                u[i] += (a_hat_transpose[i * k + j] * r_hat[j]).into(); // into ring = NTT^(-1)
-            }
+        let u: Vec<RingElement<P>> = e_1
+            .iter()
+            .enumerate()
+            .map(|(i, e1_elem)| {
+                let sum: RingElement<P> = (0..k)
+                    .map(|j| (a_hat_transpose[i * k + j] * r_hat[j]).into())
+                    .sum();
+                *e1_elem + sum
+            })
+            .collect();
+
+        // TODO: handle this error
+        let mu = RingElement::<P>::decode_decompress_1(&self.m).unwrap();
+
+        let mut v = NttElement::<P>::zero();
+        for i in 0..t_hat.len() {
+            v += t_hat[i] * r_hat[i];
         }
-        println!("{:?}", u);
-        vec![]
+        let mut v = v.ntt_inv();
+        v += e2;
+        v += mu;
+
+        let mut c: Vec<u8> = Vec::with_capacity(1088);
+        for f in u.iter() {
+            c = RingElement::compress_and_encode_10(c, *f);
+        }
+        c = RingElement::compress_and_encode_4(c, v);
+
+        c
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{constants::parameter_sets::P768, Secret};
+    use crate::{
+        constants::{kpke_encrypt_result, parameter_sets::P768},
+        Secret,
+    };
 
     fn pretty_print_vec_u8(vec: &Vec<u8>) {
         for (index, &element) in vec.iter().enumerate() {
@@ -81,16 +104,11 @@ mod tests {
 
     #[test]
     fn smoke_test_instantiate_over_parameter_sets() {
-        // let m_512: Secret<P512> = Secret::new([0_u8; 32]);
-        // let (ek, dk) = m_512.k_pke_keygen(&[0_u8; 32]);
-
-        let s: Secret<P768> = Secret::new([0_u8; 32]);
+        let s: Secret<P768> = Secret::new([4_u8; 32]);
         let ek: &[u8] = &[0_u8; 1184];
         let r: &[u8; 32] = &[0_u8; 32];
 
-        s.k_pke_encrypt(ek, r);
-
-        // let m_1024: Secret<P1024> = Secret::new([0_u8; 32]);
-        // let (ek, dk) = m_1024.k_pke_keygen(&[0_u8; 32]);
+        let res = s.k_pke_encrypt(ek, r);
+        assert_eq!(res, kpke_encrypt_result)
     }
 }

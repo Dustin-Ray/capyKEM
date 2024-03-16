@@ -24,7 +24,7 @@ mod tests {
 
         let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0x01);
         let b = RingElement::new(sample_poly_cbd_result.map(|val| F::new(val)));
-        assert_eq!(a.coefficients, b.coefficients);
+        assert_eq!(a.coefs, b.coefs);
     }
 
     #[test]
@@ -58,7 +58,7 @@ mod tests {
         let result = a + b;
 
         assert!(
-            result.coefficients.iter().all(|x| x.val() < 3329),
+            result.coefs.iter().all(|x| x.val() < 3329),
             "Summed elements are not reduced!"
         );
     }
@@ -94,7 +94,7 @@ mod tests {
         let a_vals: [F<P768>; 256] = [F::new(123); 256];
         let a = RingElement::new(a_vals);
         let mut inverse_vals = [F::zero(); 256];
-        for (i, val) in a.coefficients.iter().enumerate() {
+        for (i, val) in a.coefs.iter().enumerate() {
             inverse_vals[i] = -*val; // Negate each coefficient
         }
         let b = RingElement::new(inverse_vals);

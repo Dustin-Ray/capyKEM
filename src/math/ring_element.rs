@@ -1,4 +1,5 @@
 use core::fmt;
+use core::iter::Sum;
 use core::ops::AddAssign;
 use core::ops::{Add, Sub};
 
@@ -9,7 +10,7 @@ use sha3::{
 
 use alloc::vec::Vec;
 
-use crate::constants::ml_kem_constants::N;
+use crate::constants::ml_kem_constants::{self, n, q};
 use crate::constants::parameter_sets::ParameterSet;
 use crate::math::field_element::FieldElement as F;
 
@@ -17,13 +18,13 @@ use crate::math::field_element::FieldElement as F;
 /// which themselves are [F].
 #[derive(Clone, Copy)]
 pub struct RingElement<P> {
-    pub coefficients: [F<P>; 256],
+    pub coefs: [F<P>; 256],
 }
 
 impl<P: ParameterSet + Copy> RingElement<P> {
     // Create a new RingElement from a vector of FieldElements
     pub fn new(val: [F<P>; 256]) -> Self {
-        RingElement { coefficients: val }
+        RingElement { coefs: val }
     }
 
     pub fn zero() -> Self {
@@ -35,10 +36,9 @@ impl<P: ParameterSet + Copy> RingElement<P> {
     pub fn byte_encode(self) -> Vec<u8> {
         let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
 
-        for i in (0..self.coefficients.len()).step_by(2) {
+        for i in (0..self.coefs.len()).step_by(2) {
             // Combine two 12-bit integers into a single 24-bit integer
-            let x = u32::from(self.coefficients[i].val())
-                | (u32::from(self.coefficients[i + 1].val()) << 12);
+            let x = u32::from(self.coefs[i].val()) | (u32::from(self.coefs[i + 1].val()) << 12);
 
             // Split the 24-bit integer into 3 bytes and append to the output vector
             out.push((x & 0xFF) as u8); // First 8 bits
@@ -48,6 +48,83 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         out
     }
 
+    pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
+        const MASK_12: u32 = 0b1111_1111_1111;
+        if b.len() != (ml_kem_constants::ENCODE_SIZE_12).into() {
+            return Err("Invalid encoding length".to_owned());
+        }
+
+        let mut f = Vec::with_capacity(n.into());
+
+        let mut i = 0;
+        while i < b.len() {
+            let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
+            let elem1 = F::new((d & MASK_12) as u16)
+                .check_reduced()
+                .map_err(|_| "Invalid polynomial encoding")?;
+
+            let elem2 = F::new((d >> 12) as u16)
+                .check_reduced()
+                .map_err(|_| "Invalid polynomial encoding")?;
+
+            f.push(elem1);
+            f.push(elem2);
+
+            i += 3;
+        }
+        let coefficients: [F<P>; 256] = f
+            .try_into()
+            .map_err(|_| "Conversion to fixed-size array failed")?;
+
+        Ok(Self {
+            coefs: coefficients,
+        })
+    }
+
+    pub fn decode_decompress_1(b: &[u8]) -> Result<Self, &'static str> {
+        // TODO: check fips203 for length check requirement
+
+        let coefs: [F<P>; 256] = (0..256)
+            .map(|i| {
+                let bit = (b[i / 8] >> (i % 8)) & 1; // Extract the i-th bit
+                F::new(bit as u16 * q / 2)
+            })
+            .collect::<Vec<F<P>>>()
+            .try_into()
+            .unwrap_or_else(|_| panic!("Incorrect vector size, expected 256 elements"));
+
+        Ok(RingElement { coefs })
+    }
+
+    pub fn compress_and_encode_10(mut s: Vec<u8>, f: Self) -> Vec<u8> {
+        s.reserve(320);
+
+        for i in (0..256).step_by(4) {
+            let mut x: u64 = 0;
+            x |= F::<P>::compress::<10>(&f.coefs[i as usize]) as u64;
+            x |= (F::<P>::compress::<10>(&f.coefs[(i + 1) as usize]) as u64) << 10;
+            x |= (F::<P>::compress::<10>(&f.coefs[(i + 2) as usize]) as u64) << 20;
+            x |= (F::<P>::compress::<10>(&f.coefs[(i + 3) as usize]) as u64) << 30;
+            s.push((x & 0xFF) as u8);
+            s.push(((x >> 8) & 0xFF) as u8);
+            s.push(((x >> 16) & 0xFF) as u8);
+            s.push(((x >> 24) & 0xFF) as u8);
+            s.push(((x >> 32) & 0xFF) as u8);
+        }
+        s
+    }
+
+    pub fn compress_and_encode_4(mut s: Vec<u8>, f: Self) -> Vec<u8> {
+        s.reserve(128);
+
+        for i in (0..256).step_by(2) {
+            let compressed_pair = F::<P>::compress::<4>(&f.coefs[i as usize]) as u8
+                | (F::<P>::compress::<4>(&f.coefs[(i + 1) as usize]) as u8) << 4;
+            s.push(compressed_pair);
+        }
+        s
+    }
+
     // REMARKS:
     // TODO: parameterize eta1 and eta 2
     pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement<P> {
@@ -55,13 +132,13 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         prf.update(s);
         prf.update(&[b]);
 
-        let mut b = [0u8; (N / 2) as usize];
+        let mut b = [0u8; (n / 2) as usize];
         let mut reader = prf.finalize_xof();
         reader.read(&mut b);
 
-        let mut f = [F::new(0); N as usize];
+        let mut f = [F::new(0); n as usize];
 
-        for i in (0..N).step_by(2) {
+        for i in (0..n).step_by(2) {
             // Iterate through indices, stepping by 2.
             let b = b[(i / 2) as usize];
             let b_7 = (b >> 7) & 1;
@@ -75,7 +152,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
             f[i as usize] = F::new((b_0 + b_1).into()) - F::new((b_2 + b_3).into());
             // Ensure i+1 doesn't go out of bounds, relevant if N is odd.
-            if i + 1 < N {
+            if i + 1 < n {
                 f[(i + 1) as usize] = F::new((b_4 + b_5).into()) - F::new((b_6 + b_7).into());
             }
         }
@@ -85,7 +162,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
 impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (index, element) in self.coefficients.iter().enumerate() {
+        for (index, element) in self.coefs.iter().enumerate() {
             write!(f, "{:<8}", element.val())?;
             // Adjust for row width
             if (index + 1) % 8 == 0 {
@@ -104,7 +181,7 @@ impl<P: ParameterSet + Copy> From<[F<P>; 256]> for RingElement<P> {
 
 impl<P: ParameterSet + Copy> AddAssign for RingElement<P> {
     fn add_assign(&mut self, other: Self) {
-        for (lhs, rhs) in self.coefficients.iter_mut().zip(other.coefficients.iter()) {
+        for (lhs, rhs) in self.coefs.iter_mut().zip(other.coefs.iter()) {
             *lhs += *rhs;
         }
     }
@@ -115,16 +192,22 @@ impl<P: ParameterSet + Copy> Add for RingElement<P> {
 
     fn add(self, other: Self) -> Self::Output {
         assert_eq!(
-            self.coefficients.len(),
-            other.coefficients.len(),
+            self.coefs.len(),
+            other.coefs.len(),
             "RingElements must be of the same length"
         );
 
         let mut result = [F::zero(); 256];
-        for (i, item) in self.coefficients.iter().enumerate().take(256) {
-            result[i] = *item + other.coefficients[i];
+        for (i, item) in self.coefs.iter().enumerate().take(256) {
+            result[i] = *item + other.coefs[i];
         }
         RingElement::new(result)
+    }
+}
+
+impl<P: ParameterSet + Copy> Sum for RingElement<P> {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(RingElement::<P>::zero(), |acc, elem| acc + elem)
     }
 }
 
@@ -133,14 +216,14 @@ impl<P: ParameterSet + Copy> Sub for RingElement<P> {
 
     fn sub(self, other: Self) -> Self::Output {
         assert_eq!(
-            self.coefficients.len(),
-            other.coefficients.len(),
+            self.coefs.len(),
+            other.coefs.len(),
             "RingElements must be of the same length"
         );
 
         let mut result = [F::zero(); 256];
-        for (i, item) in self.coefficients.iter().enumerate().take(256) {
-            result[i] = *item - other.coefficients[i];
+        for (i, item) in self.coefs.iter().enumerate().take(256) {
+            result[i] = *item - other.coefs[i];
         }
         RingElement::new(result)
     }
@@ -148,12 +231,12 @@ impl<P: ParameterSet + Copy> Sub for RingElement<P> {
 
 impl<P: ParameterSet + Copy + PartialEq> PartialEq for RingElement<P> {
     fn eq(&self, other: &Self) -> bool {
-        if self.coefficients.len() != other.coefficients.len() {
+        if self.coefs.len() != other.coefs.len() {
             return false;
         }
-        self.coefficients
+        self.coefs
             .iter()
-            .zip(other.coefficients.iter())
+            .zip(other.coefs.iter())
             .all(|(a, b)| a == b)
     }
 }

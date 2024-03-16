@@ -51,8 +51,8 @@ mod tests {
         // runs .ntt() on intstantiation
         let ntt_element = NttElement::new(&mut ring_element);
         assert_eq!(
-            ring_element_copy.coefficients,
-            Into::<RingElement<P768>>::into(ntt_element).coefficients
+            ring_element_copy.coefs,
+            Into::<RingElement<P768>>::into(ntt_element).coefs
         );
     }
 
@@ -155,7 +155,7 @@ mod tests {
 
         // Decode the bytes back into a vector of F
         let decoded_elements: NttElement<P768> =
-            NttElement::poly_byte_decode(&encoded_bytes).expect("Decoding failed");
+            NttElement::byte_decode_12(&encoded_bytes).expect("Decoding failed");
 
         // Verify the decoded vector matches the original RingElement's array
         assert_eq!(

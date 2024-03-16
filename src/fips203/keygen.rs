@@ -21,7 +21,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
         let rho: &[u8] = &b[0..32];
         let sigma = &b[32..64];
 
-        let k = P::K as usize;
+        let k = P::k as usize;
         let mut n = 0;
 
         // Generate the matrix a_hat
