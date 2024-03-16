@@ -237,16 +237,3 @@ pub const kpke_encrypd_result: &[u8] = &[
     8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0, 8, 0, 0, 0,
     8, 0, 0, 0, 8, 0, 0,
 ];
-
-#[test]
-fn find_differences() {
-    for (index, (&byte1, &byte2)) in kpke_encrypt_result
-        .iter()
-        .zip(kpke_encrypd_result.iter())
-        .enumerate()
-    {
-        if byte1 != byte2 {
-            println!("Difference at index {}: {} != {}", index, byte1, byte2);
-        }
-    }
-}

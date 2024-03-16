@@ -2,6 +2,9 @@ use super::{field_element::FieldElement as F, ring_element::RingElement};
 use crate::constants::ml_kem_constants::{self, n, q};
 use crate::constants::parameter_sets::ParameterSet;
 use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::fmt;
 use core::ops::Add;
 use core::ops::{AddAssign, Mul};
@@ -31,10 +34,6 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         NttElement {
             coefficients: [F::zero(); 256],
         }
-    }
-
-    pub fn get_ring(&self) -> [F<P>; 256] {
-        self.coefficients
     }
 
     pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement<P> {
@@ -141,24 +140,6 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         RingElement::new(self.coefficients)
     }
 
-    // REMARKS:
-    // make generic for NTT and Ring
-    pub fn poly_byte_encode(self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(256 * 12 / 8);
-
-        for i in (0..self.coefficients.len()).step_by(2) {
-            // Combine two 12-bit integers into a single 24-bit integer
-            let x = u32::from(self.coefficients[i].val())
-                | (u32::from(self.coefficients[i + 1].val()) << 12);
-
-            // Split the 24-bit integer into 3 bytes and append to the output vector
-            out.push((x & 0xFF) as u8); // First 8 bits
-            out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
-            out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
-        }
-        out
-    }
-
     pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
         const MASK_12: u32 = 0b1111_1111_1111;
         if b.len() != (ml_kem_constants::ENCODE_SIZE_12).into() {
@@ -226,15 +207,6 @@ impl<P: ParameterSet + Copy> From<RingElement<P>> for NttElement<P> {
 impl<P: ParameterSet + Copy> From<NttElement<P>> for RingElement<P> {
     fn from(mut val: NttElement<P>) -> Self {
         val.ntt_inv()
-    }
-}
-
-impl<P: ParameterSet + Copy + core::cmp::PartialEq> PartialEq for NttElement<P> {
-    fn eq(&self, other: &Self) -> bool {
-        self.coefficients
-            .iter()
-            .zip(other.coefficients.iter())
-            .all(|(a, b)| a == b)
     }
 }
 

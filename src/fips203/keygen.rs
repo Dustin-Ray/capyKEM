@@ -114,18 +114,18 @@ mod tests {
         Secret,
     };
 
-    fn pretty_print_vec_u8(vec: &Vec<u8>) {
-        for (index, &element) in vec.iter().enumerate() {
-            print!("{:<8}", element);
-            if (index + 1) % 8 == 0 {
-                println!();
-            }
-        }
-        // Handle the case where the Vec doesn't end exactly at a row boundary
-        if !vec.is_empty() && vec.len() % 16 != 0 {
-            println!(); // Ensure there's a newline at the end if needed
-        }
-    }
+    // fn pretty_print_vec_u8(vec: &Vec<u8>) {
+    //     for (index, &element) in vec.iter().enumerate() {
+    //         print!("{:<8}", element);
+    //         if (index + 1) % 8 == 0 {
+    //             println!();
+    //         }
+    //     }
+    //     // Handle the case where the Vec doesn't end exactly at a row boundary
+    //     if !vec.is_empty() && vec.len() % 16 != 0 {
+    //         println!(); // Ensure there's a newline at the end if needed
+    //     }
+    // }
 
     #[test]
     fn smoke_test_instantiate_over_parameter_sets() {

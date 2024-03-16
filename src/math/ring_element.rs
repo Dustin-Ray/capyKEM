@@ -1,18 +1,15 @@
+use crate::constants::ml_kem_constants::{n, q};
+use crate::constants::parameter_sets::ParameterSet;
+use crate::math::field_element::FieldElement as F;
+use alloc::vec::Vec;
 use core::fmt;
 use core::iter::Sum;
 use core::ops::AddAssign;
 use core::ops::{Add, Sub};
-
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake256,
 };
-
-use alloc::vec::Vec;
-
-use crate::constants::ml_kem_constants::{self, n, q};
-use crate::constants::parameter_sets::ParameterSet;
-use crate::math::field_element::FieldElement as F;
 
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [F].
@@ -29,56 +26,6 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
     pub fn zero() -> Self {
         [F::new(0); 256].into()
-    }
-
-    // REMARKS:
-    // make generic for NTT and Ring
-    pub fn byte_encode(self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(256 * 12 / 8); // Preallocate the output vector
-
-        for i in (0..self.coefs.len()).step_by(2) {
-            // Combine two 12-bit integers into a single 24-bit integer
-            let x = u32::from(self.coefs[i].val()) | (u32::from(self.coefs[i + 1].val()) << 12);
-
-            // Split the 24-bit integer into 3 bytes and append to the output vector
-            out.push((x & 0xFF) as u8); // First 8 bits
-            out.push(((x >> 8) & 0xFF) as u8); // Next 8 bits
-            out.push(((x >> 16) & 0xFF) as u8); // Last 8 bits
-        }
-        out
-    }
-
-    pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
-        const MASK_12: u32 = 0b1111_1111_1111;
-        if b.len() != (ml_kem_constants::ENCODE_SIZE_12).into() {
-            return Err("Invalid encoding length".to_owned());
-        }
-
-        let mut f = Vec::with_capacity(n.into());
-
-        let mut i = 0;
-        while i < b.len() {
-            let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
-            let elem1 = F::new((d & MASK_12) as u16)
-                .check_reduced()
-                .map_err(|_| "Invalid polynomial encoding")?;
-
-            let elem2 = F::new((d >> 12) as u16)
-                .check_reduced()
-                .map_err(|_| "Invalid polynomial encoding")?;
-
-            f.push(elem1);
-            f.push(elem2);
-
-            i += 3;
-        }
-        let coefficients: [F<P>; 256] = f
-            .try_into()
-            .map_err(|_| "Conversion to fixed-size array failed")?;
-
-        Ok(Self {
-            coefs: coefficients,
-        })
     }
 
     pub fn decode_decompress_1(b: &[u8]) -> Result<Self, &'static str> {

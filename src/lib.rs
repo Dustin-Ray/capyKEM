@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 extern crate alloc;
 use constants::parameter_sets::ParameterSet;
 use core::marker::PhantomData;

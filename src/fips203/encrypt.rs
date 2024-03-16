@@ -1,5 +1,5 @@
-use alloc::vec;
 use alloc::vec::Vec;
+use alloc::{string::ToString, vec};
 
 use crate::{
     constants::parameter_sets::ParameterSet,
@@ -90,17 +90,17 @@ mod tests {
         Secret,
     };
 
-    fn pretty_print_vec_u8(vec: &Vec<u8>) {
-        for (index, &element) in vec.iter().enumerate() {
-            print!("{:<8}", element);
-            if (index + 1) % 8 == 0 {
-                println!();
-            }
-        }
-        if !vec.is_empty() && vec.len() % 16 != 0 {
-            println!();
-        }
-    }
+    // fn pretty_print_vec_u8(vec: &Vec<u8>) {
+    //     for (index, &element) in vec.iter().enumerate() {
+    //         print!("{:<8}", element);
+    //         if (index + 1) % 8 == 0 {
+    //             println!();
+    //         }
+    //     }
+    //     if !vec.is_empty() && vec.len() % 16 != 0 {
+    //         println!();
+    //     }
+    // }
 
     #[test]
     fn smoke_test_instantiate_over_parameter_sets() {
