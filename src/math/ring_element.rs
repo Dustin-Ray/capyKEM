@@ -43,6 +43,60 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         Ok(RingElement { coefs })
     }
 
+    pub fn decode_and_decompress_10(b: &[u8]) -> Result<Self, &'static str> {
+        let mut f = RingElement {
+            coefs: [F::zero(); 256],
+        };
+        let mut x: u64;
+        let mut slice = b;
+
+        for i in (0..n).step_by(4) {
+            x = u64::from(slice[0])
+                | u64::from(slice[1]) << 8
+                | u64::from(slice[2]) << 16
+                | u64::from(slice[3]) << 24
+                | u64::from(slice[4]) << 32;
+            slice = &slice[5..]; // Move the slice window
+
+            f.coefs[i as usize] = F::decompress::<10>((x & 0x3FF) as u16);
+            f.coefs[i as usize + 1] = F::decompress::<10>((x >> 10 & 0x3FF) as u16);
+            f.coefs[i as usize + 2] = F::decompress::<10>((x >> 20 & 0x3FF) as u16);
+            f.coefs[i as usize + 3] = F::decompress::<10>((x >> 30 & 0x3FF) as u16);
+        }
+
+        Ok(f)
+    }
+
+    pub fn decode_and_decompress_4(b: &[u8]) -> Result<Self, &'static str> {
+        if b.len() != 128 {
+            return Err("invalid encoding length");
+        }
+
+        let mut f = RingElement {
+            coefs: [F::zero(); n as usize],
+        }; // Assuming n and F::zero() are defined
+        let mut index = 0;
+
+        for chunk in b.iter() {
+            if index >= f.coefs.len() {
+                break; // Prevents out-of-bounds access if n is not exactly double b's length
+            }
+
+            // Decompress the lower 4 bits
+            f.coefs[index] = F::decompress::<4>(((*chunk) & 0x0F) as u16);
+            index += 1;
+
+            // Check if we should also process the upper 4 bits
+            if index < f.coefs.len() {
+                // Decompress the upper 4 bits
+                f.coefs[index] = F::decompress::<4>(((*chunk) >> 4) as u16);
+                index += 1;
+            }
+        }
+
+        Ok(f)
+    }
+
     pub fn compress_and_encode_10(mut s: Vec<u8>, f: Self) -> Vec<u8> {
         s.reserve(320);
 

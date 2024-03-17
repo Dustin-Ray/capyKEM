@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use alloc::{string::ToString, vec};
 
 use crate::{
     constants::parameter_sets::ParameterSet,
@@ -8,21 +7,16 @@ use crate::{
 };
 
 impl<P: ParameterSet + Copy> Secret<P> {
-    fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
-        let k = P::k as usize;
+    pub fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
+        let k: usize = P::k.into();
         let mut n = 0;
         // handle this error
-        let mut t_hat: Vec<NttElement<P>> = Vec::with_capacity(k);
+        let mut t_hat = vec![NttElement::<P>::zero(); k];
 
-        // Process each chunk of 384 bytes to decode it into an NttElement
-        // TODO: parameterize 384
-        let decoded_ek_pke: Result<Vec<_>, _> = ek_pke
-            .chunks_exact(384) // Create an iterator that yields slices of ek_pke in chunks of 384 bytes.
-            .take(k) // Ensure we only take k elements
-            .map(|chunk| NttElement::<P>::byte_decode_12(chunk).map_err(|e| e.to_string()))
-            .collect(); // Collect results into a vector, handling errors automatically.
-
-        t_hat.extend(decoded_ek_pke.unwrap());
+        // TODO: parameterize 384 as encodesize12
+        for i in 0..t_hat.len() {
+            t_hat[i] = NttElement::<P>::byte_decode_12(&ek_pke[i * 384..(i + 1) * 384]).unwrap();
+        }
 
         let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
 
@@ -90,25 +84,25 @@ mod tests {
         Secret,
     };
 
-    // fn pretty_print_vec_u8(vec: &Vec<u8>) {
-    //     for (index, &element) in vec.iter().enumerate() {
-    //         print!("{:<8}", element);
-    //         if (index + 1) % 8 == 0 {
-    //             println!();
-    //         }
-    //     }
-    //     if !vec.is_empty() && vec.len() % 16 != 0 {
-    //         println!();
-    //     }
-    // }
-
     #[test]
-    fn smoke_test_instantiate_over_parameter_sets() {
+    fn smoke_test_encryption() {
         let s: Secret<P768> = Secret::new([4_u8; 32]);
         let ek: &[u8] = &[0_u8; 1184];
         let r: &[u8; 32] = &[0_u8; 32];
 
         let res = s.k_pke_encrypt(ek, r);
         assert_eq!(res, kpke_encrypt_result)
+    }
+}
+
+fn pretty_print_vec_u8(vec: &[u8]) {
+    for (index, &element) in vec.iter().enumerate() {
+        print!("{:<8}", element);
+        if (index + 1) % 8 == 0 {
+            println!();
+        }
+    }
+    if !vec.is_empty() && vec.len() % 16 != 0 {
+        println!();
     }
 }

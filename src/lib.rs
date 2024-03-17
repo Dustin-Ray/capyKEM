@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 extern crate alloc;
 use constants::parameter_sets::ParameterSet;
 use core::marker::PhantomData;
@@ -17,6 +17,7 @@ pub mod math;
 /// that will be exchanged via encapsulation/decapsulation.
 /// It is defined over generic parameter set defined
 /// by NIST of various security levels.
+
 #[derive(Debug)]
 pub struct Secret<P> {
     pub m: [u8; 32],

@@ -28,6 +28,15 @@ impl<P: ParameterSet> FieldElement<P> {
         f
     }
 
+    /// This should ONLY be used when certain that
+    /// val is < q
+    pub fn from(val: u16) -> Self {
+        FieldElement {
+            val,
+            _marker: PhantomData,
+        }
+    }
+
     pub fn zero() -> Self {
         FieldElement {
             val: 0,
@@ -74,12 +83,12 @@ impl<P: ParameterSet> FieldElement<P> {
     }
 
     /// FIPS 203 (DRAFT), Definition 4.6
-    pub fn decompress<const D: u16>(&self) -> u16 {
-        let dividend = u32::from(self.val);
+    pub fn decompress<const d: u16>(y: u16) -> Self {
+        let dividend = u32::from(y);
         let dividend = dividend.wrapping_mul(q.into());
-        let mut quotient = dividend.wrapping_shr(D.into());
-        quotient = quotient.wrapping_add((dividend.wrapping_shr(u32::from(D) - 1)) & 1);
-        quotient as u16
+        let mut quotient = dividend.wrapping_shr(d.into());
+        quotient = quotient.wrapping_add((dividend.wrapping_shr(u32::from(d) - 1)) & 1);
+        Self::from(quotient as u16)
     }
 
     fn barrett_reduce(product: u32) -> Self {
@@ -280,12 +289,8 @@ mod tests {
         ];
 
         for (val, expected) in test_cases {
-            let fe: F<P768> = F {
-                val,
-                _marker: PhantomData,
-            };
-            let compressed = fe.decompress::<4>();
-            assert_eq!(compressed, expected, "Compression of {} failed", val);
+            let compressed = F::<P768>::decompress::<4>(val);
+            assert_eq!(compressed.val, expected, "Compression of {} failed", val);
         }
     }
 

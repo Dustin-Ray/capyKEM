@@ -140,6 +140,22 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         RingElement::new(self.coefficients)
     }
 
+    pub fn byte_encode_12(&self, mut b: Vec<u8>) -> Vec<u8> {
+        b.reserve(384);
+        let mut cursor = b.len();
+        b.resize(b.len() + 384, 0);
+
+        for i in (0..n).step_by(2) {
+            let x = self.coefficients[i as usize].val() as u32
+                | (self.coefficients[i as usize + 1].val() as u32) << 12;
+            b[cursor] = (x & 0xFF) as u8;
+            b[cursor + 1] = ((x >> 8) & 0xFF) as u8;
+            b[cursor + 2] = ((x >> 16) & 0xFF) as u8;
+            cursor += 3;
+        }
+        b
+    }
+
     pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
         const MASK_12: u32 = 0b1111_1111_1111;
         if b.len() != (ml_kem_constants::ENCODE_SIZE_12).into() {
