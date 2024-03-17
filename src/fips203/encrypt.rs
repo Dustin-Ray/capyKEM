@@ -8,10 +8,11 @@ use crate::{
 
 impl<P: ParameterSet + Copy> Secret<P> {
     pub fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
-        let k: usize = P::k.into();
+        // TODO: parameterize this
+        const k: usize = 3;
         let mut n = 0;
         // handle this error
-        let mut t_hat = vec![NttElement::<P>::zero(); k];
+        let mut t_hat = [NttElement::<P>::zero(); k];
 
         // TODO: parameterize 384 as encodesize12
         for i in 0..t_hat.len() {
@@ -21,7 +22,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
         let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
 
         // Generate the matrix a_hat^T
-        let mut a_hat_transpose = vec![NttElement::<P>::zero(); k * k];
+        let mut a_hat_transpose = [NttElement::<P>::zero(); k * k];
         for i in 0..k {
             for j in 0..k {
                 a_hat_transpose[i * k + j] = NttElement::sample_ntt(rho, i, j);
@@ -29,14 +30,14 @@ impl<P: ParameterSet + Copy> Secret<P> {
         }
 
         // generate r, run ntt k times
-        let mut r_hat = vec![NttElement::<P>::zero(); k];
+        let mut r_hat = [NttElement::<P>::zero(); k];
         for r_elem in r_hat.iter_mut().take(k) {
             *r_elem = RingElement::sample_poly_cbd(rand, n).into();
             n += 1;
         }
 
         // generate e1
-        let mut e_1 = vec![RingElement::<P>::zero(); k];
+        let mut e_1 = [RingElement::<P>::zero(); k];
         for e_elem in e_1.iter_mut().take(k) {
             *e_elem = RingElement::sample_poly_cbd(rand, n);
             n += 1;

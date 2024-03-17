@@ -71,4 +71,3 @@ impl<P: ParameterSet + Copy> Secret<P> {
         (ek_pke, dk_pke)
     }
 }
-

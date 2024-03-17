@@ -126,19 +126,14 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         s
     }
 
-    pub fn compress_and_encode_1(&self) -> Vec<u8> {
-        let mut s: Vec<u8> = vec![];
-        // TODO: parameterize encoding_size_1 as const
-        let encoding_size_1 = 32;
-        s.reserve(encoding_size_1);
-        let start_len = s.len();
-        s.resize(start_len + encoding_size_1, 0);
+    pub fn compress_and_encode_1(&self, s: &mut [u8]) {
+        for (i, coef) in self.coefs.iter().enumerate() {
+            let compressed = F::<P>::compress::<1>(coef) as u8;
+            let byte_index = i / 8;
+            let bit_index = i % 8;
 
-        for (i, _) in self.coefs.iter().enumerate() {
-            let compressed = F::<P>::compress::<1>(&self.coefs[i as usize]) as u8;
-            s[start_len + i / 8] |= compressed << (i % 8);
+            s[byte_index] |= compressed << bit_index;
         }
-        s
     }
 
     // REMARKS:

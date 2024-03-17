@@ -19,7 +19,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
             u.push(f);
             slice = next;
         }
-        
+
         // TODO: make this parameter
         let encoding_size_12 = 384;
         let mut slice = dk_pke;
@@ -40,24 +40,21 @@ impl<P: ParameterSet + Copy> Secret<P> {
         }
 
         let w = v - y;
-        w.compress_and_encode_1()
+        let mut s = [0_u8; 32];
+        w.compress_and_encode_1(&mut s);
+        s.to_vec()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        constants::
-            parameter_sets::P768
-        ,
-        Secret,
-    };
+    use crate::{constants::parameter_sets::P768, Secret};
 
     #[test]
     fn roundtrip() {
         let s: Secret<P768> = Secret::new([4_u8; 32]);
-        let r: &[u8; 32] = &[4_u8; 32];
-        let (ek, dk_pke) = s.k_pke_keygen(&[4_u8; 32]);
+        let r = &[42_u8; 32];
+        let (ek, dk_pke) = s.k_pke_keygen(&r);
         let c = s.k_pke_encrypt(&ek, r);
         let dec = s.k_pke_decrypt(&dk_pke, &c);
         assert_eq!(dec, s.m);
