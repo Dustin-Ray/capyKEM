@@ -7,10 +7,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use sha3::{Digest, Sha3_512};
 
-// NOTES:
-// TODO: determine difference between PRF and XOF here
 impl<P: ParameterSet + Copy> Secret<P> {
-    // should be private
     pub fn k_pke_keygen(&self, d: &[u8; 32]) -> (Vec<u8>, Vec<u8>) {
         let mut hasher = Sha3_512::default();
         hasher.update(d);
