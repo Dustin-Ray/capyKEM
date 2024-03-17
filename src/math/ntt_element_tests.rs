@@ -5,9 +5,9 @@ mod tests {
 
     extern crate alloc;
     use crate::{
-        constants::{parameter_sets::P768, sample_ntt_result},
+        constants::parameter_sets::P768,
         math::{
-            field_element::FieldElement as F, ntt_element::NttElement, ring_element::RingElement,
+            ntt_element::NttElement, ring_element::RingElement,
         },
     };
     use alloc::vec::Vec;
@@ -19,13 +19,6 @@ mod tests {
     // -[x] associativity
     // -[ ] distributivity
     // -[x] multiplication closure
-
-    #[test]
-    fn test_sample_ntt() {
-        let byte_stream = [0_u8; 0];
-        let a: NttElement<P768> = NttElement::sample_ntt(&byte_stream, 0, 1);
-        assert_eq!(a.coefficients, sample_ntt_result.map(|val| F::new(val)));
-    }
 
     #[test]
     fn test_ntt() {

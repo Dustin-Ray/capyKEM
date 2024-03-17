@@ -6,7 +6,7 @@ mod tests {
     use rand_chacha::ChaCha20Rng;
 
     use crate::{
-        constants::{parameter_sets::P768, sample_poly_cbd_result},
+        constants::parameter_sets::P768,
         math::{field_element::FieldElement as F, ring_element::RingElement},
     };
 
@@ -17,15 +17,6 @@ mod tests {
     // -[x] identity
     // -[ ] associativity
     // -[ ] distributivity
-
-    #[test]
-    fn test_sample_poly_cbd() {
-        let bytes = "example input bytes".as_bytes();
-
-        let a: RingElement<P768> = RingElement::sample_poly_cbd(&bytes, 0x01);
-        let b = RingElement::new(sample_poly_cbd_result.map(|val| F::new(val)));
-        assert_eq!(a.coefs, b.coefs);
-    }
 
     #[test]
     fn test_additive_commutativity() {

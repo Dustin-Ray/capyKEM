@@ -1,56 +1,65 @@
 use alloc::vec::Vec;
 
-use crate::{constants::parameter_sets::ParameterSet, math::ring_element::RingElement, Secret};
+use crate::{
+    constants::parameter_sets::ParameterSet,
+    math::{ntt_element::NttElement, ring_element::RingElement},
+    Secret,
+};
 
 impl<P: ParameterSet + Copy> Secret<P> {
-    // TODO: make this return an error
-    pub fn k_pke_decrypt(&self, dk_pke: &[u8], mut c: &[u8]) -> Vec<u8> {
-        let mut u: Vec<RingElement<P>> = Vec::new();
-        let slice = c;
-
+    // TODO: make this return an error and handle them internally
+    pub fn k_pke_decrypt(&self, dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
+        // TODO: make this parameter
         let encoding_size_10: usize = 320;
-
+        let mut slice = c;
+        let mut u: Vec<RingElement<P>> = Vec::new();
         for _ in 0..P::k {
-            // Attempt to decode and decompress the first portion of `c`.
-            // `decode_and_decompress_10` is assumed to be a function that returns a `RingElement`
-            // and consumes exactly `ENCODING_SIZE_10` bytes from the beginning of `c`.
-            let (current, next) = c.split_at(320);
+            let (current, next) = slice.split_at(encoding_size_10);
             let f = RingElement::decode_and_decompress_10(current).unwrap();
-
             u.push(f);
-            c = next; // Move to the next segment of `c`.
+            slice = next;
         }
-        // println!("{:?}", u);
-        vec![]
+        
+        // TODO: make this parameter
+        let encoding_size_12 = 384;
+        let mut slice = dk_pke;
+        let mut s_hat: Vec<NttElement<P>> = Vec::new();
+        for _ in 0..P::k {
+            let (current, next) = slice.split_at(encoding_size_12);
+            let f = NttElement::byte_decode_12(current).unwrap();
+            s_hat.push(f);
+            slice = next;
+        }
+
+        //TODO: handle this error
+        let v = RingElement::<P>::decode_and_decompress_4(&c[c.len() - 128..c.len()]).unwrap();
+
+        let mut y = RingElement::<P>::zero();
+        for i in 0..s_hat.len() {
+            y += (s_hat[i] * u[i].into()).into();
+        }
+
+        let w = v - y;
+        w.compress_and_encode_1()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{constants::parameter_sets::P768, Secret};
+    use crate::{
+        constants::
+            parameter_sets::P768
+        ,
+        Secret,
+    };
 
     #[test]
-    fn test_decrypt() {
-        let m_768: Secret<P768> = Secret::new([4_u8; 32]);
-        let rand: &[u8; 32] = &[4_u8; 32];
-
-        let (ek, dk) = m_768.k_pke_keygen(rand);
-        // pretty_print_vec_u8(&ek);
-
-        let c = m_768.k_pke_encrypt(&ek, rand);
-        // pretty_print_vec_u8(&c);
-        let m = m_768.k_pke_decrypt(&dk, &c);
-    }
-
-    fn pretty_print_vec_u8(vec: &Vec<u8>) {
-        for (index, &element) in vec.iter().enumerate() {
-            print!("{:<8}", element);
-            if (index + 1) % 8 == 0 {
-                println!();
-            }
-        }
-        if !vec.is_empty() && vec.len() % 16 != 0 {
-            println!();
-        }
+    fn roundtrip() {
+        let s: Secret<P768> = Secret::new([4_u8; 32]);
+        let r: &[u8; 32] = &[4_u8; 32];
+        let (ek, dk_pke) = s.k_pke_keygen(&[4_u8; 32]);
+        let c = s.k_pke_encrypt(&ek, r);
+        let dec = s.k_pke_decrypt(&dk_pke, &c);
+        assert_eq!(dec, s.m);
     }
 }

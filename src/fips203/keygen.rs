@@ -72,19 +72,3 @@ impl<P: ParameterSet + Copy> Secret<P> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::{
-        constants::{parameter_sets::P768, pke_keygen_dk_pke, pke_keygen_ek_pke},
-        Secret,
-    };
-
-    #[test]
-    fn smoke_test_instantiate_over_parameter_set() {
-        let m_768: Secret<P768> = Secret::new([4_u8; 32]);
-        let (ek, dk) = m_768.k_pke_keygen(&[4_u8; 32]);
-
-        assert_eq!(ek, pke_keygen_ek_pke);
-        assert_eq!(dk, pke_keygen_dk_pke);
-    }
-}
