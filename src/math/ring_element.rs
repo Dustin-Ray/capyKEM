@@ -30,7 +30,6 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
     pub fn decode_decompress_1(b: &[u8]) -> Result<Self, &'static str> {
         // TODO: check fips203 for length check requirement
-
         let coefs: [F<P>; 256] = (0..256)
             .map(|i| {
                 let bit = (b[i / 8] >> (i % 8)) & 1; // Extract the i-th bit

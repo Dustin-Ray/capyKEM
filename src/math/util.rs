@@ -28,14 +28,11 @@ fn mod_pow(base: u32, exp: u32, modulus: u32) -> u16 {
 #[cfg(test)]
 mod tests {
     extern crate alloc;
-
     use alloc::vec::Vec;
-
     use crate::constants::{K_INVERSE_NTT_ROOTS, K_MOD_ROOTS, K_NTT_ROOTS};
-
     use super::*;
-
     const Q: u16 = 3329;
+    
     #[test]
     fn create_and_test_kntt_roots() {
         let kntt_roots: Vec<u16> = (0..128)
