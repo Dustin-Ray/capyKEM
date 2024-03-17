@@ -80,29 +80,45 @@ impl<P: ParameterSet + Copy> Secret<P> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        constants::{kpke_encrypt_result, parameter_sets::P768},
+        constants::{
+            kpke_encrypt_result, parameter_sets::P768, pke_keygen_dk_pke, pke_keygen_ek_pke,
+        },
         Secret,
     };
 
     #[test]
     fn smoke_test_encryption() {
         let s: Secret<P768> = Secret::new([4_u8; 32]);
-        let ek: &[u8] = &[0_u8; 1184];
-        let r: &[u8; 32] = &[0_u8; 32];
-
-        let res = s.k_pke_encrypt(ek, r);
+        let r: &[u8; 32] = &[4_u8; 32];
+        let (ek, dk) = s.k_pke_keygen(&[4_u8; 32]);
+        assert_eq!(ek, pke_keygen_ek_pke);
+        assert_eq!(dk, pke_keygen_dk_pke);
+        let res = s.k_pke_encrypt(&ek, r);
         assert_eq!(res, kpke_encrypt_result)
     }
 }
 
-fn pretty_print_vec_u8(vec: &[u8]) {
+pub fn pretty_print_vec_u8(vec: &[u8]) {
     for (index, &element) in vec.iter().enumerate() {
         print!("{:<8}", element);
         if (index + 1) % 8 == 0 {
             println!();
         }
     }
+    // Handle the case where the Vec doesn't end exactly at a row boundary
     if !vec.is_empty() && vec.len() % 16 != 0 {
-        println!();
+        println!(); // Ensure there's a newline at the end if needed
+    }
+}
+
+pub fn compare_arrays(a: &[u8], b: &[u8]) {
+    if a.len() != b.len() {
+        println!("Arrays have different lengths");
+    }
+
+    for (i, (&val1, &val2)) in a.iter().zip(b.iter()).enumerate() {
+        if val1 != val2 {
+            println!("Difference found at index {}: {} vs {}", i, val1, val2);
+        }
     }
 }

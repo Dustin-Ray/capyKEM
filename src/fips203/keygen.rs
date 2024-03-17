@@ -40,8 +40,6 @@ impl<P: ParameterSet + Copy> Secret<P> {
             n += 1;
         }
 
-        // dbg!(s_hat.clone());
-
         // generate e
         let mut e_hat = vec![NttElement::zero(); k];
         for e_elem in e_hat.iter_mut().take(k) {
@@ -66,7 +64,6 @@ impl<P: ParameterSet + Copy> Secret<P> {
         ek_pke.append(&mut rho.into());
 
         let mut dk_pke: Vec<u8> = Vec::with_capacity(1152);
-
         for &item in s_hat.iter() {
             dk_pke = item.byte_encode_12(dk_pke);
         }
@@ -78,10 +75,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        constants::{
-            parameter_sets::P768,
-            pke_keygen_dk_pke, pke_keygen_ek_pke,
-        },
+        constants::{parameter_sets::P768, pke_keygen_dk_pke, pke_keygen_ek_pke},
         Secret,
     };
 
@@ -92,30 +86,5 @@ mod tests {
 
         assert_eq!(ek, pke_keygen_ek_pke);
         assert_eq!(dk, pke_keygen_dk_pke);
-    }
-}
-
-fn pretty_print_vec_u8(vec: &[u8]) {
-    for (index, &element) in vec.iter().enumerate() {
-        print!("{:<8}", element);
-        if (index + 1) % 8 == 0 {
-            println!();
-        }
-    }
-    // Handle the case where the Vec doesn't end exactly at a row boundary
-    if !vec.is_empty() && vec.len() % 16 != 0 {
-        println!(); // Ensure there's a newline at the end if needed
-    }
-}
-
-fn compare_arrays(a: &[u8], b: &[u8]) {
-    if a.len() != b.len() {
-        println!("Arrays have different lengths");
-    }
-
-    for (i, (&val1, &val2)) in a.iter().zip(b.iter()).enumerate() {
-        if val1 != val2 {
-            println!("Difference found at index {}: {} vs {}", i, val1, val2);
-        }
     }
 }
