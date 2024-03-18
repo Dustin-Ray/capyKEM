@@ -8,7 +8,6 @@ use crate::{
 };
 use alloc::vec::Vec;
 use sha3::{Digest, Sha3_512};
-use typenum::Unsigned;
 
 impl<P: ParameterSet + Copy> Secret<P> {
     pub fn k_pke_keygen(&self, d: &[u8; 32]) -> (Vec<u8>, Vec<u8>) {

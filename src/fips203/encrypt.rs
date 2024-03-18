@@ -8,7 +8,6 @@ use crate::{
     math::{ntt_element::NttElement, ring_element::RingElement},
     Secret,
 };
-use typenum::Unsigned;
 
 impl<P: ParameterSet + Copy> Secret<P> {
     pub fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
