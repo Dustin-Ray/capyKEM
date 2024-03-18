@@ -1,7 +1,9 @@
 [package]
-name = "mlkem"
+name = "capyKEM"
 version = "0.1.0"
 edition = "2021"
+description = "Exercise in quantum-resistant cryptographic algorithm design."
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
