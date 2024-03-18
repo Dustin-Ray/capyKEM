@@ -1,11 +1,9 @@
 use core::marker::PhantomData;
 use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 
+use crate::constants::barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift};
 use crate::constants::ml_kem_constants::q;
-use crate::constants::{
-    barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
-    parameter_sets::ParameterSet,
-};
+use crate::constants::parameter_sets::ParameterSet;
 
 pub enum OperationError {
     UnreducedFieldElementError,
@@ -169,7 +167,7 @@ mod tests {
     use core::marker::PhantomData;
 
     use crate::{
-        constants::{ml_kem_constants::q, parameter_sets::P768},
+        constants::{ml_kem_constants::q, parameter_sets::KEM_768},
         math::field_element::FieldElement as F,
     };
 
@@ -181,7 +179,7 @@ mod tests {
     #[test]
     fn exhaustive_test_reduce_once() {
         for i in q + 1..=2 * q {
-            let element: F<P768> = F::new(i);
+            let element: F<KEM_768> = F::new(i);
             assert!(
                 element.val <= q,
                 "Value should be reduced within [0, Q] range for input: {i}, but got: {}",
@@ -194,8 +192,8 @@ mod tests {
     fn exhaustive_test_addition() {
         for i in 0..3329 {
             for j in 0..3329 {
-                let a: F<P768> = F::new(i);
-                let b: F<P768> = F::new(j);
+                let a: F<KEM_768> = F::new(i);
+                let b: F<KEM_768> = F::new(j);
                 let result = a + b;
                 assert_eq!(result.val, (i + j) % 3329);
             }
@@ -206,8 +204,8 @@ mod tests {
     fn exhaustive_test_subtraction() {
         for i in 0..3329 {
             for j in 0..3329 {
-                let a: F<P768> = F::new(i);
-                let b: F<P768> = F::new(j);
+                let a: F<KEM_768> = F::new(i);
+                let b: F<KEM_768> = F::new(j);
                 let result = a - b;
                 let expected = (i as isize - j as isize + 3329 as isize) % 3329;
 
@@ -220,7 +218,7 @@ mod tests {
     fn exhaustive_test_multiplication() {
         for i in 0..3329 {
             for j in 0..3329 {
-                let a: F<P768> = F::new(i);
+                let a: F<KEM_768> = F::new(i);
                 let b = j;
                 let result = a * b;
                 let expected = (i as u32 * j as u32) % 3329;
@@ -231,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_multiplication_with_potential_overflow() {
-        let a: F<P768> = F::new(3000);
+        let a: F<KEM_768> = F::new(3000);
         let b = 3000;
         let result = a * b;
         let expected = (3000u32 * 3000u32) % 3329u32;
@@ -243,14 +241,14 @@ mod tests {
 
     #[test]
     fn test_check_reduced_ok() {
-        assert!(F::<P768>::new(q - 1).check_reduced().is_ok());
+        assert!(F::<KEM_768>::new(q - 1).check_reduced().is_ok());
     }
 
     #[test]
     fn test_check_reduced_err() {
         assert!(F {
             val: q + 1,
-            _marker: PhantomData::<P768>
+            _marker: PhantomData::<KEM_768>
         }
         .check_reduced()
         .is_err());
@@ -268,7 +266,7 @@ mod tests {
         ];
 
         for (val, expected) in test_cases {
-            let fe: F<P768> = F {
+            let fe: F<KEM_768> = F {
                 val,
                 _marker: PhantomData,
             };
@@ -289,14 +287,14 @@ mod tests {
         ];
 
         for (val, expected) in test_cases {
-            let compressed = F::<P768>::decompress::<4>(val);
+            let compressed = F::<KEM_768>::decompress::<4>(val);
             assert_eq!(compressed.val, expected, "Compression of {} failed", val);
         }
     }
 
     #[test]
     fn test_compress_with_mask() {
-        let fe: F<P768> = F {
+        let fe: F<KEM_768> = F {
             val: 12345,
             _marker: PhantomData,
         };

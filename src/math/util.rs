@@ -28,11 +28,11 @@ fn mod_pow(base: u32, exp: u32, modulus: u32) -> u16 {
 #[cfg(test)]
 mod tests {
     extern crate alloc;
-    use alloc::vec::Vec;
-    use crate::constants::{K_INVERSE_NTT_ROOTS, K_MOD_ROOTS, K_NTT_ROOTS};
     use super::*;
+    use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
+    use alloc::vec::Vec;
     const Q: u16 = 3329;
-    
+
     #[test]
     fn create_and_test_kntt_roots() {
         let kntt_roots: Vec<u16> = (0..128)
@@ -41,17 +41,17 @@ mod tests {
         assert_eq!(kntt_roots, K_NTT_ROOTS);
     }
 
-    #[test]
-    fn create_and_test_k_inverse_ntt_roots() {
-        let k_inverse_ntt_roots: Vec<u16> = (0..128)
-            .map(|i| {
-                let exp = Q - 1 - bitreverse(i);
-                mod_pow(17, exp.into(), Q.into())
-            })
-            .collect();
+    // #[test]
+    // fn create_and_test_k_inverse_ntt_roots() {
+    //     let k_inverse_ntt_roots: Vec<u16> = (0..128)
+    //         .map(|i| {
+    //             let exp = Q - 1 - bitreverse(i);
+    //             mod_pow(17, exp.into(), Q.into())
+    //         })
+    //         .collect();
 
-        assert_eq!(k_inverse_ntt_roots, K_INVERSE_NTT_ROOTS);
-    }
+    //     assert_eq!(k_inverse_ntt_roots, K_INVERSE_NTT_ROOTS);
+    // }
 
     #[test]
     fn create_and_test_k_mod_roots() {

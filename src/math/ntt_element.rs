@@ -1,7 +1,7 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
-use crate::constants::ml_kem_constants::{self, n, q};
-use crate::constants::parameter_sets::ParameterSet;
+use crate::constants::ml_kem_constants::{n, q, ENCODE_12, MASK_12};
 use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
+use crate::ParameterSet;
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -18,7 +18,7 @@ use sha3::{
 
 #[derive(Clone, Copy)]
 pub struct NttElement<P> {
-    pub coefficients: [F<P>; 256],
+    pub coefficients: [F<P>; n],
 }
 
 impl<P: ParameterSet + Copy> NttElement<P> {
@@ -32,7 +32,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
 
     pub fn zero() -> Self {
         NttElement {
-            coefficients: [F::zero(); 256],
+            coefficients: [F::zero(); n],
         }
     }
 
@@ -47,7 +47,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         let mut j = 0usize;
         let mut buf = [0u8; 24];
         let mut off = 24usize;
-        while j < n.into() {
+        while j < n {
             if off >= 24 {
                 reader.read(&mut buf);
                 off = 0;
@@ -62,7 +62,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
                 a.coefficients[j] = F::new(d1);
                 j += 1;
             }
-            if j >= n.into() {
+            if j >= n {
                 break;
             }
 
@@ -103,7 +103,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         let mut k = 1;
         let mut len = 128;
         while len >= 2 {
-            for start in (0..256).step_by(2 * len) {
+            for start in (0..n).step_by(2 * len) {
                 let zeta = K_NTT_ROOTS[k];
                 k += 1;
 
@@ -122,7 +122,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         let mut k = 127;
         let mut len = 2;
         while len <= 128 {
-            for start in (0..256).step_by(2 * len) {
+            for start in (0..n).step_by(2 * len) {
                 let zeta = K_NTT_ROOTS[k];
                 k -= 1;
 
@@ -141,13 +141,13 @@ impl<P: ParameterSet + Copy> NttElement<P> {
     }
 
     pub fn byte_encode_12(&self, mut b: Vec<u8>) -> Vec<u8> {
-        b.reserve(384);
+        b.reserve(ENCODE_12);
         let mut cursor = b.len();
-        b.resize(b.len() + 384, 0);
+        b.resize(b.len() + ENCODE_12, 0);
 
         for i in (0..n).step_by(2) {
-            let x = self.coefficients[i as usize].val() as u32
-                | (self.coefficients[i as usize + 1].val() as u32) << 12;
+            let x =
+                self.coefficients[i].val() as u32 | (self.coefficients[i + 1].val() as u32) << 12;
             b[cursor] = (x & 0xFF) as u8;
             b[cursor + 1] = ((x >> 8) & 0xFF) as u8;
             b[cursor + 2] = ((x >> 16) & 0xFF) as u8;
@@ -157,12 +157,11 @@ impl<P: ParameterSet + Copy> NttElement<P> {
     }
 
     pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
-        const MASK_12: u32 = 0b1111_1111_1111;
-        if b.len() != (ml_kem_constants::ENCODE_SIZE_12).into() {
+        if b.len() != (ENCODE_12) {
             return Err("Invalid encoding length".to_owned());
         }
 
-        let mut f = Vec::with_capacity(n.into());
+        let mut f = Vec::with_capacity(n);
 
         let mut i = 0;
         while i < b.len() {
@@ -180,7 +179,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
 
             i += 3;
         }
-        let coefficients: [F<P>; 256] = f
+        let coefficients: [F<P>; n] = f
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;
 
@@ -198,8 +197,8 @@ impl<P: ParameterSet + Copy> Add for NttElement<P> {
             "RingElements must be of the same length"
         );
 
-        let mut coefficients = [F::zero(); 256];
-        for (i, item) in self.coefficients.iter().enumerate().take(256) {
+        let mut coefficients = [F::zero(); n];
+        for (i, item) in self.coefficients.iter().enumerate().take(n) {
             coefficients[i] = *item + other.coefficients[i];
         }
         NttElement { coefficients }

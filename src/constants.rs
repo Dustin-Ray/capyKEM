@@ -1,53 +1,66 @@
-#[allow(dead_code)]
 pub mod ml_kem_constants {
     pub const q: u16 = 3329;
-    pub const n: u16 = 256;
-    pub const ENCODE_SIZE_12: u16 = n * 12 / 8;
+    pub const n: usize = 256;
+
+    pub const ENCODE_4: usize = n * 4 / 8;
+    pub const ENCODE_10: usize = n * 10 / 8;
+    pub const ENCODE_12: usize = n * 12 / 8;
+    pub const E_PKE_KEYSIZE: usize = k * ENCODE_12 + 32;
+    pub const D_PKE_KEYSIZE: usize = k * ENCODE_12;
+    pub const CIPHERTEXT_SIZE: usize = k * ENCODE_10 + ENCODE_4;
+    // 32(d_u * k + d_v) - 32(d_u * k)
+    pub const C2_SIZE: usize = (32 * (k * du + dv)) - 32 * (du * k);
+    pub const MASK_12: u32 = 0b1111_1111_1111;
+
+    pub const k: usize = 3;
+    pub const du: usize = 10;
+    pub const dv: usize = 4;
 }
 
+#[allow(non_camel_case_types)]
 // appendix table 2
-#[allow(dead_code)]
-
 pub mod parameter_sets {
 
-    // Requireed random bit generator strength
-    // 512 -> RBG(128)
-    // 768 -> RBG(192)
-    // 1024 -> RBG(256)
-
     pub trait ParameterSet {
-        const k: u16;
-        const ETA_ONE: u16;
-        const ETA_TWO: u16;
-        const du: u16;
-        const dv: u16;
+        // Define each parameter as an associated type.
+        type K: Unsigned;
+        type KSquared: Unsigned;
+        type EtaOne: Unsigned;
+        type EtaTwo: Unsigned;
+        type Du: Unsigned;
+        type Dv: Unsigned;
+    }
+
+    use typenum::{Unsigned, U10, U11, U16, U2, U3, U4, U5, U9};
+    #[derive(Clone, Copy, PartialEq, Debug)]
+    pub struct KEM_512;
+    impl ParameterSet for KEM_512 {
+        type K = U2;
+        type KSquared = U4;
+        type EtaOne = U3;
+        type EtaTwo = U2;
+        type Du = U10;
+        type Dv = U4;
     }
     #[derive(Clone, Copy, PartialEq, Debug)]
-    pub struct P512;
-    impl ParameterSet for P512 {
-        const k: u16 = 2;
-        const ETA_ONE: u16 = 3;
-        const ETA_TWO: u16 = 2;
-        const du: u16 = 10;
-        const dv: u16 = 4;
+    pub struct KEM_768;
+    impl ParameterSet for KEM_768 {
+        type K = U3;
+        type KSquared = U9;
+        type EtaOne = U2;
+        type EtaTwo = U2;
+        type Du = U10;
+        type Dv = U4;
     }
     #[derive(Clone, Copy, PartialEq, Debug)]
-    pub struct P768;
-    impl ParameterSet for P768 {
-        const k: u16 = 3;
-        const ETA_ONE: u16 = 2;
-        const ETA_TWO: u16 = 2;
-        const du: u16 = 10;
-        const dv: u16 = 4;
-    }
-    #[derive(Clone, Copy, PartialEq, Debug)]
-    pub struct P1024;
-    impl ParameterSet for P1024 {
-        const k: u16 = 4;
-        const ETA_ONE: u16 = 2;
-        const ETA_TWO: u16 = 2;
-        const du: u16 = 11;
-        const dv: u16 = 5;
+    pub struct KEM_1024;
+    impl ParameterSet for KEM_1024 {
+        type K = U4;
+        type KSquared = U16;
+        type EtaOne = U2;
+        type EtaTwo = U2;
+        type Du = U11;
+        type Dv = U5;
     }
 }
 
@@ -67,18 +80,6 @@ pub const K_NTT_ROOTS: [u16; 128] = [
     1789, 1847, 952, 1461, 2687, 939, 2308, 2437, 2388, 733, 2337, 268, 641, 1584, 2298, 2037,
     3220, 375, 2549, 2090, 1645, 1063, 319, 2773, 757, 2099, 561, 2466, 2594, 2804, 1092, 403,
     1026, 1143, 2150, 2775, 886, 1722, 1212, 1874, 1029, 2110, 2935, 885, 2154,
-];
-
-/// obtained externally and verified in utils.rs
-pub const K_INVERSE_NTT_ROOTS: [u16; 128] = [
-    1, 1600, 40, 749, 2481, 1432, 2699, 687, 1583, 2760, 69, 543, 2532, 3136, 1410, 2267, 2508,
-    1355, 450, 936, 447, 2794, 1235, 1903, 1996, 1089, 3273, 283, 1853, 1990, 882, 3033, 2419,
-    2102, 219, 855, 2681, 1848, 712, 682, 927, 1795, 461, 1891, 2877, 2522, 1894, 1010, 1414, 2009,
-    3296, 464, 2697, 816, 1352, 2679, 1274, 1052, 1025, 2132, 1573, 76, 2998, 3040, 1175, 2444,
-    394, 1219, 2300, 1455, 2117, 1607, 2443, 554, 1179, 2186, 2303, 2926, 2237, 525, 735, 863,
-    2768, 1230, 2572, 556, 3010, 2266, 1684, 1239, 780, 2954, 109, 1292, 1031, 1745, 2688, 3061,
-    992, 2596, 941, 892, 1021, 2390, 642, 1868, 2377, 1482, 1540, 540, 1678, 1626, 279, 314, 1173,
-    2573, 3096, 48, 667, 1920, 2229, 1041, 2606, 1692, 680, 2746, 568, 3312,
 ];
 
 /// obtained externally and verified in utils.rs

@@ -1,6 +1,6 @@
-use crate::constants::ml_kem_constants::{n, q};
-use crate::constants::parameter_sets::ParameterSet;
+use crate::constants::ml_kem_constants::{n, q, ENCODE_10};
 use crate::math::field_element::FieldElement as F;
+use crate::ParameterSet;
 use alloc::vec::Vec;
 use core::fmt;
 use core::iter::Sum;
@@ -15,22 +15,22 @@ use sha3::{
 /// which themselves are [F].
 #[derive(Clone, Copy)]
 pub struct RingElement<P> {
-    pub coefs: [F<P>; 256],
+    pub coefs: [F<P>; n],
 }
 
 impl<P: ParameterSet + Copy> RingElement<P> {
     // Create a new RingElement from a vector of FieldElements
-    pub fn new(val: [F<P>; 256]) -> Self {
+    pub fn new(val: [F<P>; n]) -> Self {
         RingElement { coefs: val }
     }
 
     pub fn zero() -> Self {
-        [F::new(0); 256].into()
+        [F::new(0); n].into()
     }
 
     pub fn decode_decompress_1(b: &[u8]) -> Result<Self, &'static str> {
         // TODO: check fips203 for length check requirement
-        let coefs: [F<P>; 256] = (0..256)
+        let coefs: [F<P>; n] = (0..n)
             .map(|i| {
                 let bit = (b[i / 8] >> (i % 8)) & 1; // Extract the i-th bit
                 F::new(bit as u16 * q / 2)
@@ -44,7 +44,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
     pub fn decode_and_decompress_10(b: &[u8]) -> Result<Self, &'static str> {
         let mut f = RingElement {
-            coefs: [F::zero(); 256],
+            coefs: [F::zero(); n],
         };
         let mut x: u64;
         let mut slice = b;
@@ -57,10 +57,10 @@ impl<P: ParameterSet + Copy> RingElement<P> {
                 | u64::from(slice[4]) << 32;
             slice = &slice[5..]; // Move the slice window
 
-            f.coefs[i as usize] = F::decompress::<10>((x & 0x3FF) as u16);
-            f.coefs[i as usize + 1] = F::decompress::<10>((x >> 10 & 0x3FF) as u16);
-            f.coefs[i as usize + 2] = F::decompress::<10>((x >> 20 & 0x3FF) as u16);
-            f.coefs[i as usize + 3] = F::decompress::<10>((x >> 30 & 0x3FF) as u16);
+            f.coefs[i] = F::decompress::<10>((x & 0x3FF) as u16);
+            f.coefs[i + 1] = F::decompress::<10>((x >> 10 & 0x3FF) as u16);
+            f.coefs[i + 2] = F::decompress::<10>((x >> 20 & 0x3FF) as u16);
+            f.coefs[i + 3] = F::decompress::<10>((x >> 30 & 0x3FF) as u16);
         }
 
         Ok(f)
@@ -72,7 +72,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         }
 
         let mut f = RingElement {
-            coefs: [F::zero(); n as usize],
+            coefs: [F::zero(); n],
         }; // Assuming n and F::zero() are defined
         let mut index = 0;
 
@@ -97,29 +97,30 @@ impl<P: ParameterSet + Copy> RingElement<P> {
     }
 
     pub fn compress_and_encode_10(mut s: Vec<u8>, f: Self) -> Vec<u8> {
-        s.reserve(320);
+        s.reserve(ENCODE_10);
 
-        for i in (0..256).step_by(4) {
+        for i in (0..f.coefs.len()).step_by(4) {
             let mut x: u64 = 0;
-            x |= F::<P>::compress::<10>(&f.coefs[i as usize]) as u64;
-            x |= (F::<P>::compress::<10>(&f.coefs[(i + 1) as usize]) as u64) << 10;
-            x |= (F::<P>::compress::<10>(&f.coefs[(i + 2) as usize]) as u64) << 20;
-            x |= (F::<P>::compress::<10>(&f.coefs[(i + 3) as usize]) as u64) << 30;
-            s.push((x & 0xFF) as u8);
-            s.push(((x >> 8) & 0xFF) as u8);
-            s.push(((x >> 16) & 0xFF) as u8);
-            s.push(((x >> 24) & 0xFF) as u8);
-            s.push(((x >> 32) & 0xFF) as u8);
+            for j in 0..4 {
+                if i + j < f.coefs.len() {
+                    let shift = j * 10;
+                    x |= (F::<P>::compress::<10>(&f.coefs[i + j]) as u64) << shift;
+                }
+            }
+            for shift in (0..40).step_by(8) {
+                s.push(((x >> shift) & 0xFF) as u8);
+            }
         }
+
         s
     }
 
     pub fn compress_and_encode_4(mut s: Vec<u8>, f: Self) -> Vec<u8> {
         s.reserve(128);
 
-        for i in (0..256).step_by(2) {
-            let compressed_pair = F::<P>::compress::<4>(&f.coefs[i as usize]) as u8
-                | (F::<P>::compress::<4>(&f.coefs[(i + 1) as usize]) as u8) << 4;
+        for i in (0..n).step_by(2) {
+            let compressed_pair = F::<P>::compress::<4>(&f.coefs[i]) as u8
+                | (F::<P>::compress::<4>(&f.coefs[i + 1]) as u8) << 4;
             s.push(compressed_pair);
         }
         s
@@ -134,23 +135,22 @@ impl<P: ParameterSet + Copy> RingElement<P> {
             s[byte_index] |= compressed << bit_index;
         }
     }
-
-    // REMARKS:
-    // TODO: parameterize eta1 and eta 2
-    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement<P> {
+    // TODO: make eta const/generic
+    pub fn sample_poly_cbd(s: &[u8], b: u8, _eta: usize) -> RingElement<P> {
         let mut prf = Shake256::default();
         prf.update(s);
         prf.update(&[b]);
 
-        let mut b = [0u8; (n / 2) as usize];
+        // this should be 64 * eta
+        let mut b = [0u8; 128];
         let mut reader = prf.finalize_xof();
         reader.read(&mut b);
 
-        let mut f = [F::new(0); n as usize];
+        let mut f = [F::new(0); n];
 
         for i in (0..n).step_by(2) {
             // Iterate through indices, stepping by 2.
-            let b = b[(i / 2) as usize];
+            let b = b[i / 2];
             let b_7 = (b >> 7) & 1;
             let b_6 = (b >> 6) & 1;
             let b_5 = (b >> 5) & 1;
@@ -160,10 +160,10 @@ impl<P: ParameterSet + Copy> RingElement<P> {
             let b_1 = (b >> 1) & 1;
             let b_0 = b & 1;
 
-            f[i as usize] = F::new((b_0 + b_1).into()) - F::new((b_2 + b_3).into());
+            f[i] = F::new((b_0 + b_1).into()) - F::new((b_2 + b_3).into());
             // Ensure i+1 doesn't go out of bounds, relevant if N is odd.
             if i + 1 < n {
-                f[(i + 1) as usize] = F::new((b_4 + b_5).into()) - F::new((b_6 + b_7).into());
+                f[i + 1] = F::new((b_4 + b_5).into()) - F::new((b_6 + b_7).into());
             }
         }
         RingElement::new(f)
@@ -183,8 +183,8 @@ impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> From<[F<P>; 256]> for RingElement<P> {
-    fn from(val: [F<P>; 256]) -> Self {
+impl<P: ParameterSet + Copy> From<[F<P>; n]> for RingElement<P> {
+    fn from(val: [F<P>; n]) -> Self {
         RingElement::new(val)
     }
 }
@@ -207,8 +207,8 @@ impl<P: ParameterSet + Copy> Add for RingElement<P> {
             "RingElements must be of the same length"
         );
 
-        let mut result = [F::zero(); 256];
-        for (i, item) in self.coefs.iter().enumerate().take(256) {
+        let mut result = [F::zero(); n];
+        for (i, item) in self.coefs.iter().enumerate().take(n) {
             result[i] = *item + other.coefs[i];
         }
         RingElement::new(result)
@@ -231,8 +231,8 @@ impl<P: ParameterSet + Copy> Sub for RingElement<P> {
             "RingElements must be of the same length"
         );
 
-        let mut result = [F::zero(); 256];
-        for (i, item) in self.coefs.iter().enumerate().take(256) {
+        let mut result = [F::zero(); n];
+        for (i, item) in self.coefs.iter().enumerate().take(n) {
             result[i] = *item - other.coefs[i];
         }
         RingElement::new(result)

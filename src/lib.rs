@@ -1,16 +1,13 @@
 #![no_std]
 extern crate alloc;
-use constants::parameter_sets::ParameterSet;
+use crate::constants::parameter_sets::ParameterSet;
 use core::marker::PhantomData;
 
-#[allow(dead_code)]
 #[allow(non_upper_case_globals)]
 mod constants;
 #[allow(non_upper_case_globals)]
-#[allow(dead_code)]
 mod fips203;
 #[allow(non_upper_case_globals)]
-#[allow(dead_code)]
 pub mod math;
 
 /// A container for the 32-byte shared secret key

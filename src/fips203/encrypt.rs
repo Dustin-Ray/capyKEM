@@ -1,25 +1,30 @@
 use alloc::vec::Vec;
 
 use crate::{
-    constants::parameter_sets::ParameterSet,
+    constants::{
+        ml_kem_constants::{self, CIPHERTEXT_SIZE, ENCODE_12},
+        parameter_sets::ParameterSet,
+    },
     math::{ntt_element::NttElement, ring_element::RingElement},
     Secret,
 };
+use typenum::Unsigned;
 
 impl<P: ParameterSet + Copy> Secret<P> {
     pub fn k_pke_encrypt(&self, ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
         // TODO: parameterize this
-        const k: usize = 3;
+        const k: usize = ml_kem_constants::k;
         let mut n = 0;
         // handle this error
         let mut t_hat = [NttElement::<P>::zero(); k];
 
         // TODO: parameterize 384 as encodesize12
         for i in 0..t_hat.len() {
-            t_hat[i] = NttElement::<P>::byte_decode_12(&ek_pke[i * 384..(i + 1) * 384]).unwrap();
+            t_hat[i] = NttElement::<P>::byte_decode_12(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12])
+                .unwrap();
         }
 
-        let rho: &[u8] = &ek_pke[384 * k..(384 * k) + 32];
+        let rho: &[u8] = &ek_pke[ENCODE_12 * k..(ENCODE_12 * k) + 32];
 
         // Generate the matrix a_hat^T
         let mut a_hat_transpose = [NttElement::<P>::zero(); k * k];
@@ -32,19 +37,19 @@ impl<P: ParameterSet + Copy> Secret<P> {
         // generate r, run ntt k times
         let mut r_hat = [NttElement::<P>::zero(); k];
         for r_elem in r_hat.iter_mut().take(k) {
-            *r_elem = RingElement::sample_poly_cbd(rand, n).into();
+            *r_elem = RingElement::sample_poly_cbd(rand, n, P::EtaOne::to_usize()).into();
             n += 1;
         }
 
         // generate e1
         let mut e_1 = [RingElement::<P>::zero(); k];
         for e_elem in e_1.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd(rand, n);
+            *e_elem = RingElement::sample_poly_cbd(rand, n, P::EtaTwo::to_usize());
             n += 1;
         }
 
         // sample e2
-        let e2: RingElement<P> = RingElement::sample_poly_cbd(rand, n);
+        let e2: RingElement<P> = RingElement::sample_poly_cbd(rand, n, P::EtaTwo::to_usize());
 
         let u: Vec<RingElement<P>> = e_1
             .iter()
@@ -68,7 +73,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
         v += e2;
         v += mu;
 
-        let mut c: Vec<u8> = Vec::with_capacity(1088);
+        let mut c: Vec<u8> = Vec::with_capacity(CIPHERTEXT_SIZE);
         for f in u.iter() {
             c = RingElement::compress_and_encode_10(c, *f);
         }
