@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn roundtrip() {
-        let s: Secret<KEM_1024> = Secret::new([4_u8; 32]);
+        let s: Secret<KEM_512> = Secret::new([4_u8; 32]);
         let r = &[42_u8; 32];
         let (ek, dk_pke) = s.k_pke_keygen(&r);
         let c = s.k_pke_encrypt(&ek, r);

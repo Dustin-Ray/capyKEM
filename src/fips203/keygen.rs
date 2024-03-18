@@ -36,14 +36,14 @@ impl<P: ParameterSet + Copy> Secret<P> {
         // generate s
         let mut s_hat = [NttElement::zero(); k];
         for s_elem in s_hat.iter_mut().take(k) {
-            *s_elem = RingElement::sample_poly_cbd(sigma, n, P::EtaOne::to_usize()).into();
+            *s_elem = RingElement::sample_poly_cbd(sigma, n).into();
             n += 1;
         }
 
         // generate e
         let mut e_hat = [NttElement::zero(); k];
         for e_elem in e_hat.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd(sigma, n, P::EtaOne::to_usize()).into();
+            *e_elem = RingElement::sample_poly_cbd(sigma, n).into();
             n += 1;
         }
 

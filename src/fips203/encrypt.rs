@@ -37,19 +37,19 @@ impl<P: ParameterSet + Copy> Secret<P> {
         // generate r, run ntt k times
         let mut r_hat = [NttElement::<P>::zero(); k];
         for r_elem in r_hat.iter_mut().take(k) {
-            *r_elem = RingElement::sample_poly_cbd(rand, n, P::EtaOne::to_usize()).into();
+            *r_elem = RingElement::sample_poly_cbd(rand, n).into();
             n += 1;
         }
 
         // generate e1
         let mut e_1 = [RingElement::<P>::zero(); k];
         for e_elem in e_1.iter_mut().take(k) {
-            *e_elem = RingElement::sample_poly_cbd(rand, n, P::EtaTwo::to_usize());
+            *e_elem = RingElement::sample_poly_cbd(rand, n);
             n += 1;
         }
 
         // sample e2
-        let e2: RingElement<P> = RingElement::sample_poly_cbd(rand, n, P::EtaTwo::to_usize());
+        let e2: RingElement<P> = RingElement::sample_poly_cbd(rand, n);
 
         let u: Vec<RingElement<P>> = e_1
             .iter()

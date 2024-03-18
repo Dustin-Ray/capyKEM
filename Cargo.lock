@@ -51,6 +51,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hybrid-array"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afda7293a2c24c0c81bc1342ffc8522c41ea053f6da3d55200852123f8e1b348"
+dependencies = [
+ "typenum",
+]
+
+[[package]]
 name = "keccak"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -69,6 +78,7 @@ checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
 name = "mlkem"
 version = "0.1.0"
 dependencies = [
+ "hybrid-array",
  "sha3",
  "typenum",
 ]
