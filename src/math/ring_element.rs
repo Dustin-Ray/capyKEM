@@ -11,10 +11,6 @@ use sha3::{
     Shake256,
 };
 
-use hybrid_array::Array;
-use hybrid_array::ArrayOps;
-use typenum::{Unsigned, U0, U6};
-
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [F].
 #[derive(Clone, Copy)]
