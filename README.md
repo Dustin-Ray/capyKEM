@@ -1,6 +1,6 @@
 ## capyKEM - research into quantum-resistant algorithm design
 
-This repo is an interpretation of [FIPS 203 (draft)](https://csrc.nist.gov/pubs/fips/203/ipd) which leverages a module learning-with-errors based construction aimed towards providing a secure means of key exchange when faced with a potential quantum adversary.
+This repo is a pure rust, no-std interpretation of [FIPS 203 (draft)](https://csrc.nist.gov/pubs/fips/203/ipd) which leverages a module learning-with-errors based construction aimed towards providing a secure means of key exchange when faced with a potential quantum adversary.
 
 ### Current working items:
 
