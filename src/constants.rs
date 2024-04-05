@@ -2,12 +2,10 @@ pub mod ml_kem_constants {
     pub const q: u16 = 3329;
     pub const n: usize = 256;
 
-    pub const ENCODE_4: usize = n * 4 / 8;
     pub const ENCODE_10: usize = n * 10 / 8;
     pub const ENCODE_12: usize = n * 12 / 8;
     pub const E_PKE_KEYSIZE: usize = k * ENCODE_12 + 32;
     pub const D_PKE_KEYSIZE: usize = k * ENCODE_12;
-    pub const CIPHERTEXT_SIZE: usize = k * ENCODE_10 + ENCODE_4;
     // 32(d_u * k + d_v) - 32(d_u * k)
     pub const C2_SIZE: usize = (32 * (k * du + dv)) - 32 * (du * k);
     pub const MASK_12: u32 = 0b1111_1111_1111;
@@ -27,11 +25,13 @@ pub mod parameter_sets {
         type KSquared: Unsigned;
         type EtaOne: Unsigned;
         type EtaTwo: Unsigned;
-        type Du: Unsigned;
-        type Dv: Unsigned;
+        type Du: EncodingSize;
+        type Dv: EncodingSize;
     }
 
     use typenum::{Unsigned, U10, U11, U16, U2, U3, U4, U5, U9};
+
+    use crate::math::encoding::EncodingSize;
     #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct KEM_512;
     impl ParameterSet for KEM_512 {

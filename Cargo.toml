@@ -1,5 +1,5 @@
 [package]
-name = "capyKEM"
+name = "capykem"
 version = "0.1.0"
 edition = "2021"
 description = "Exercise in quantum-resistant cryptographic algorithm design."
@@ -9,7 +9,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hybrid-array = "0.1.0"
+hybrid-array = { version = "0.2.0-rc.8", features = ["extra-sizes"] }
 sha3 = {version = "0.10.8", default-features = false}
 typenum = {version = "1.17.0", default-features = false}
 

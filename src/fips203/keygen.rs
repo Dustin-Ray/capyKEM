@@ -24,7 +24,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
         let mut n = 0;
 
         // Generate the matrix a_hat
-        let mut a_hat: [NttElement<P>; 9] = [NttElement::zero(); k * k];
+        let mut a_hat: [NttElement; 9] = [NttElement::zero(); k * k];
         for i in 0..k {
             for j in 0..k {
                 // see: https://groups.google.com/a/list.nist.gov/g/pqc-forum/c/s-C-zIAeKfE/m/eZJmXYsSAQAJ?

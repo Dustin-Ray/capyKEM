@@ -1,7 +1,7 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
 use crate::constants::ml_kem_constants::{n, q, ENCODE_12, MASK_12};
 use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
-use crate::ParameterSet;
+
 use alloc::borrow::ToOwned;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -17,12 +17,12 @@ use sha3::{
 // or make addition generic for rings.
 
 #[derive(Clone, Copy)]
-pub struct NttElement<P> {
-    pub coefficients: [F<P>; n],
+pub struct NttElement {
+    pub coefficients: [F; n],
 }
 
-impl<P: ParameterSet + Copy> NttElement<P> {
-    pub fn new(r: &mut RingElement<P>) -> Self {
+impl NttElement {
+    pub fn new(r: &mut RingElement) -> Self {
         let mut ntt_el = NttElement {
             coefficients: r.coefs,
         };
@@ -36,7 +36,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         }
     }
 
-    pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement<P> {
+    pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement {
         let mut hasher = Shake128::default();
         hasher.update(rho);
         hasher.update(&[ii.try_into().unwrap(), jj.try_into().unwrap()]);
@@ -92,7 +92,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
         h_hat
     }
 
-    fn base_case_multiply(a_0: F<P>, a_1: F<P>, b_0: F<P>, b_1: F<P>, gamma: u16) -> (F<P>, F<P>) {
+    fn base_case_multiply(a_0: F, a_1: F, b_0: F, b_1: F, gamma: u16) -> (F, F) {
         let c_0 = (a_0 * b_0) + (a_1 * b_1) * gamma;
         let c_1 = (a_0 * b_1) + (a_1 * b_0);
         (c_0, c_1)
@@ -118,7 +118,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
     }
 
     // This should only be used when converting to Rq
-    pub fn ntt_inv(&mut self) -> RingElement<P> {
+    pub fn ntt_inv(&mut self) -> RingElement {
         let mut k = 127;
         let mut len = 2;
         while len <= 128 {
@@ -179,7 +179,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
 
             i += 3;
         }
-        let coefficients: [F<P>; n] = f
+        let coefficients: [F; n] = f
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;
 
@@ -187,7 +187,7 @@ impl<P: ParameterSet + Copy> NttElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> Add for NttElement<P> {
+impl Add for NttElement {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -205,7 +205,7 @@ impl<P: ParameterSet + Copy> Add for NttElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> AddAssign for NttElement<P> {
+impl AddAssign for NttElement {
     fn add_assign(&mut self, other: Self) {
         for (lhs, rhs) in self.coefficients.iter_mut().zip(other.coefficients.iter()) {
             *lhs += *rhs;
@@ -213,27 +213,27 @@ impl<P: ParameterSet + Copy> AddAssign for NttElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> From<RingElement<P>> for NttElement<P> {
-    fn from(mut val: RingElement<P>) -> Self {
+impl From<RingElement> for NttElement {
+    fn from(mut val: RingElement) -> Self {
         NttElement::new(&mut val)
     }
 }
 
-impl<P: ParameterSet + Copy> From<NttElement<P>> for RingElement<P> {
-    fn from(mut val: NttElement<P>) -> Self {
+impl From<NttElement> for RingElement {
+    fn from(mut val: NttElement) -> Self {
         val.ntt_inv()
     }
 }
 
-impl<P: ParameterSet + Copy> Mul<NttElement<P>> for NttElement<P> {
+impl Mul<NttElement> for NttElement {
     type Output = Self;
 
-    fn mul(self, rhs: NttElement<P>) -> Self::Output {
+    fn mul(self, rhs: NttElement) -> Self::Output {
         self.multiply_ntts(rhs)
     }
 }
 
-impl<P: ParameterSet + Copy> fmt::Debug for NttElement<P> {
+impl fmt::Debug for NttElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.coefficients.iter().enumerate() {
             // adjust for spacing between rows

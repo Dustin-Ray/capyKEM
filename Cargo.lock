@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "capyKEM"
+name = "capykem"
 version = "0.1.0"
 dependencies = [
  "hybrid-array",
@@ -61,9 +61,9 @@ dependencies = [
 
 [[package]]
 name = "hybrid-array"
-version = "0.1.0"
+version = "0.2.0-rc.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "afda7293a2c24c0c81bc1342ffc8522c41ea053f6da3d55200852123f8e1b348"
+checksum = "53668f5da5a41d9eaf4bf7064be46d1ebe6a4e1ceed817f387587b18f2b51047"
 dependencies = [
  "typenum",
 ]

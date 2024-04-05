@@ -1,6 +1,6 @@
 use crate::constants::ml_kem_constants::{n, q, ENCODE_10};
 use crate::math::field_element::FieldElement as F;
-use crate::ParameterSet;
+
 use alloc::vec::Vec;
 use core::fmt;
 use core::iter::Sum;
@@ -14,13 +14,13 @@ use sha3::{
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [F].
 #[derive(Clone, Copy)]
-pub struct RingElement<P> {
-    pub coefs: [F<P>; n],
+pub struct RingElement {
+    pub coefs: [F; n],
 }
 
-impl<P: ParameterSet + Copy> RingElement<P> {
+impl RingElement {
     // Create a new RingElement from a vector of FieldElements
-    pub fn new(val: [F<P>; n]) -> Self {
+    pub fn new(val: [F; n]) -> Self {
         RingElement { coefs: val }
     }
 
@@ -30,15 +30,14 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
     pub fn decode_decompress_1(b: &[u8]) -> Result<Self, &'static str> {
         // TODO: check fips203 for length check requirement
-        let coefs: [F<P>; n] = (0..n)
+        let coefs: [F; n] = (0..n)
             .map(|i| {
                 let bit = (b[i / 8] >> (i % 8)) & 1; // Extract the i-th bit
                 F::new(bit as u16 * q / 2)
             })
-            .collect::<Vec<F<P>>>()
+            .collect::<Vec<F>>()
             .try_into()
             .unwrap_or_else(|_| panic!("Incorrect vector size, expected 256 elements"));
-
         Ok(RingElement { coefs })
     }
 
@@ -104,7 +103,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
             for j in 0..4 {
                 if i + j < f.coefs.len() {
                     let shift = j * 10;
-                    x |= (F::<P>::compress::<10>(&f.coefs[i + j]) as u64) << shift;
+                    x |= (F::compress::<10>(&f.coefs[i + j]) as u64) << shift;
                 }
             }
             for shift in (0..40).step_by(8) {
@@ -119,8 +118,8 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         s.reserve(128);
 
         for i in (0..n).step_by(2) {
-            let compressed_pair = F::<P>::compress::<4>(&f.coefs[i]) as u8
-                | (F::<P>::compress::<4>(&f.coefs[i + 1]) as u8) << 4;
+            let compressed_pair = F::compress::<4>(&f.coefs[i]) as u8
+                | (F::compress::<4>(&f.coefs[i + 1]) as u8) << 4;
             s.push(compressed_pair);
         }
         s
@@ -128,7 +127,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
 
     pub fn compress_and_encode_1(&self, s: &mut [u8]) {
         for (i, coef) in self.coefs.iter().enumerate() {
-            let compressed = F::<P>::compress::<1>(coef) as u8;
+            let compressed = F::compress::<1>(coef) as u8;
             let byte_index = i / 8;
             let bit_index = i % 8;
 
@@ -136,7 +135,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
         }
     }
     // TODO: make eta const/generic
-    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement<P> {
+    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
         prf.update(&[b]);
@@ -170,7 +169,7 @@ impl<P: ParameterSet + Copy> RingElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
+impl fmt::Debug for RingElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (index, element) in self.coefs.iter().enumerate() {
             write!(f, "{:<8}", element.val())?;
@@ -183,13 +182,13 @@ impl<P: ParameterSet + Copy> fmt::Debug for RingElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> From<[F<P>; n]> for RingElement<P> {
-    fn from(val: [F<P>; n]) -> Self {
+impl From<[F; n]> for RingElement {
+    fn from(val: [F; n]) -> Self {
         RingElement::new(val)
     }
 }
 
-impl<P: ParameterSet + Copy> AddAssign for RingElement<P> {
+impl AddAssign for RingElement {
     fn add_assign(&mut self, other: Self) {
         for (lhs, rhs) in self.coefs.iter_mut().zip(other.coefs.iter()) {
             *lhs += *rhs;
@@ -197,7 +196,7 @@ impl<P: ParameterSet + Copy> AddAssign for RingElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> Add for RingElement<P> {
+impl Add for RingElement {
     type Output = Self;
 
     fn add(self, other: Self) -> Self::Output {
@@ -215,13 +214,13 @@ impl<P: ParameterSet + Copy> Add for RingElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy> Sum for RingElement<P> {
+impl Sum for RingElement {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
-        iter.fold(RingElement::<P>::zero(), |acc, elem| acc + elem)
+        iter.fold(RingElement::zero(), |acc, elem| acc + elem)
     }
 }
 
-impl<P: ParameterSet + Copy> Sub for RingElement<P> {
+impl Sub for RingElement {
     type Output = Self;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -239,7 +238,7 @@ impl<P: ParameterSet + Copy> Sub for RingElement<P> {
     }
 }
 
-impl<P: ParameterSet + Copy + PartialEq> PartialEq for RingElement<P> {
+impl PartialEq for RingElement {
     fn eq(&self, other: &Self) -> bool {
         if self.coefs.len() != other.coefs.len() {
             return false;
