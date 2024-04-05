@@ -6,12 +6,15 @@ use hybrid_array::typenum::{
     U32, U8,
 };
 
-use crate::math::util::Truncate;
 use core::{
     fmt::Debug,
     ops::{Div, Mul},
 };
 
+use crate::constants::ml_kem_constants::q;
+
+use super::field_element::FieldElement;
+use super::ntt_element::NttElement;
 use super::ring_element::RingElement;
 /// An array length with other useful properties
 pub trait ArraySize: hybrid_array::ArraySize + PartialEq + Debug {}
@@ -43,53 +46,48 @@ pub type Integer = u16;
 fn byte_decode<D: EncodingSize>(bytes: &[u8]) -> RingElement {
     let val_step = D::ValueStep::USIZE;
     let byte_step = D::ByteStep::USIZE;
-    let mask = (1 << D::USIZE) - 1;
+    let mask = (1u128 << D::USIZE) - 1;
 
     let mut vals = RingElement::zero();
 
     let vc = vals.coefs.chunks_mut(val_step);
-
-    dbg!(&vc);
-
     let bc = bytes.chunks(byte_step);
     for (v, b) in vc.zip(bc) {
         let mut xb = [0u8; 16];
-        xb[..byte_step].copy_from_slice(b);
+        let b_len = b.len();
+        xb[..b_len].copy_from_slice(b);
 
         let x = u128::from_le_bytes(xb);
         for (j, vj) in v.iter_mut().enumerate() {
-            let val: Integer = (x >> (D::USIZE * j)).truncate();
-            vj.set(val & mask);
+            let shift_amount = D::USIZE * j;
+            let val = (x >> shift_amount) & mask;
+
+            vj.set(val as u16);
 
             if D::USIZE == 12 {
-                vj.reduce_once();
+                vj.set(vj.val() % q);
             }
         }
     }
+
     vals
 }
 
-// Algorithm 4 ByteEncode_d(F)
-//
-// Note: This algorithm performs compression as well as encoding.
-fn byte_encode<D: EncodingSize>(vals: &RingElement) -> Vec<u8> {
+fn byte_encode<D: EncodingSize>(vals: &[FieldElement; 256]) -> Vec<u8> {
     let val_step = D::ValueStep::USIZE;
     let byte_step = D::ByteStep::USIZE;
 
-    let mut bytes = vec![];
+    let mut bytes = Vec::with_capacity(D::USIZE);
 
-    let vc = vals.coefs.chunks(val_step);
-    let bc = bytes.chunks_mut(byte_step);
-    for (v, b) in vc.zip(bc) {
+    for v in vals.chunks(val_step) {
         let mut x = 0u128;
         for (j, vj) in v.iter().enumerate() {
             x |= u128::from(vj.val()) << (D::USIZE * j);
         }
 
         let xb = x.to_le_bytes();
-        b.copy_from_slice(&xb[..byte_step]);
+        bytes.extend_from_slice(&xb[..byte_step]);
     }
-
     bytes
 }
 
@@ -103,11 +101,23 @@ impl<D: EncodingSize> Encode<D> for RingElement {
     type EncodedSize = D::EncodedPolynomialSize;
 
     fn encode(&self) -> Vec<u8> {
-        byte_encode::<D>(self)
+        byte_encode::<D>(&self.coefs)
     }
 
     fn decode(enc: &[u8]) -> Self {
         byte_decode::<D>(enc)
+    }
+}
+
+impl<D: EncodingSize> Encode<D> for NttElement {
+    type EncodedSize = D::EncodedPolynomialSize;
+
+    fn encode(&self) -> Vec<u8> {
+        byte_encode::<D>(&self.coefs)
+    }
+
+    fn decode(enc: &[u8]) -> Self {
+        byte_decode::<D>(enc).into()
     }
 }
 
@@ -132,6 +142,24 @@ pub trait Compress {
 }
 
 impl Compress for RingElement {
+    fn compress<D: CompressionFactor>(&mut self) -> &Self {
+        for x in &mut self.coefs {
+            x.compress::<D>();
+        }
+
+        self
+    }
+
+    fn decompress<D: CompressionFactor>(&mut self) -> &Self {
+        for x in &mut self.coefs {
+            x.decompress::<D>();
+        }
+
+        self
+    }
+}
+
+impl Compress for NttElement {
     fn compress<D: CompressionFactor>(&mut self) -> &Self {
         for x in &mut self.coefs {
             x.compress::<D>();

@@ -18,21 +18,19 @@ use sha3::{
 
 #[derive(Clone, Copy)]
 pub struct NttElement {
-    pub coefficients: [F; n],
+    pub coefs: [F; n],
 }
 
 impl NttElement {
     pub fn new(r: &mut RingElement) -> Self {
-        let mut ntt_el = NttElement {
-            coefficients: r.coefs,
-        };
+        let mut ntt_el = NttElement { coefs: r.coefs };
         ntt_el.ntt();
         ntt_el
     }
 
     pub fn zero() -> Self {
         NttElement {
-            coefficients: [F::zero(); n],
+            coefs: [F::zero(); n],
         }
     }
 
@@ -59,7 +57,7 @@ impl NttElement {
             off += 3;
 
             if d1 < q {
-                a.coefficients[j] = F::new(d1);
+                a.coefs[j] = F::new(d1);
                 j += 1;
             }
             if j >= n {
@@ -67,7 +65,7 @@ impl NttElement {
             }
 
             if d2 < q {
-                a.coefficients[j] = F::new(d2);
+                a.coefs[j] = F::new(d2);
                 j += 1;
             }
         }
@@ -79,14 +77,13 @@ impl NttElement {
 
         // Iterate over `K_MOD_ROOTS` with their indices
         for (i, &k_mod_root) in K_MOD_ROOTS.iter().enumerate() {
-            (h_hat.coefficients[2 * i], h_hat.coefficients[2 * i + 1]) =
-                NttElement::base_case_multiply(
-                    self.coefficients[2 * i],
-                    self.coefficients[(2 * i) + 1],
-                    other.coefficients[2 * i],
-                    other.coefficients[(2 * i) + 1],
-                    k_mod_root,
-                );
+            (h_hat.coefs[2 * i], h_hat.coefs[2 * i + 1]) = NttElement::base_case_multiply(
+                self.coefs[2 * i],
+                self.coefs[(2 * i) + 1],
+                other.coefs[2 * i],
+                other.coefs[(2 * i) + 1],
+                k_mod_root,
+            );
         }
 
         h_hat
@@ -108,9 +105,9 @@ impl NttElement {
                 k += 1;
 
                 for j in start..start + len {
-                    let t = zeta * self.coefficients[j + len] % q;
-                    self.coefficients[j + len] = self.coefficients[j] - F::new(t);
-                    self.coefficients[j] += F::new(t);
+                    let t = zeta * self.coefs[j + len] % q;
+                    self.coefs[j + len] = self.coefs[j] - F::new(t);
+                    self.coefs[j] += F::new(t);
                 }
             }
             len /= 2;
@@ -127,17 +124,17 @@ impl NttElement {
                 k -= 1;
 
                 for j in start..start + len {
-                    let t = self.coefficients[j];
-                    self.coefficients[j] = t + self.coefficients[j + len];
-                    self.coefficients[j + len] = F::new(zeta * (self.coefficients[j + len] - t));
+                    let t = self.coefs[j];
+                    self.coefs[j] = t + self.coefs[j + len];
+                    self.coefs[j + len] = F::new(zeta * (self.coefs[j + len] - t));
                 }
             }
             len *= 2;
         }
-        for item in &mut self.coefficients {
+        for item in &mut self.coefs {
             *item = *item * 3303;
         }
-        RingElement::new(self.coefficients)
+        RingElement::new(self.coefs)
     }
 
     pub fn byte_encode_12(&self, mut b: Vec<u8>) -> Vec<u8> {
@@ -146,8 +143,7 @@ impl NttElement {
         b.resize(b.len() + ENCODE_12, 0);
 
         for i in (0..n).step_by(2) {
-            let x =
-                self.coefficients[i].val() as u32 | (self.coefficients[i + 1].val() as u32) << 12;
+            let x = self.coefs[i].val() as u32 | (self.coefs[i + 1].val() as u32) << 12;
             b[cursor] = (x & 0xFF) as u8;
             b[cursor + 1] = ((x >> 8) & 0xFF) as u8;
             b[cursor + 2] = ((x >> 16) & 0xFF) as u8;
@@ -183,7 +179,9 @@ impl NttElement {
             .try_into()
             .map_err(|_| "Conversion to fixed-size array failed")?;
 
-        Ok(Self { coefficients })
+        Ok(Self {
+            coefs: coefficients,
+        })
     }
 }
 
@@ -192,22 +190,24 @@ impl Add for NttElement {
 
     fn add(self, other: Self) -> Self::Output {
         assert_eq!(
-            self.coefficients.len(),
-            other.coefficients.len(),
+            self.coefs.len(),
+            other.coefs.len(),
             "RingElements must be of the same length"
         );
 
         let mut coefficients = [F::zero(); n];
-        for (i, item) in self.coefficients.iter().enumerate().take(n) {
-            coefficients[i] = *item + other.coefficients[i];
+        for (i, item) in self.coefs.iter().enumerate().take(n) {
+            coefficients[i] = *item + other.coefs[i];
         }
-        NttElement { coefficients }
+        NttElement {
+            coefs: coefficients,
+        }
     }
 }
 
 impl AddAssign for NttElement {
     fn add_assign(&mut self, other: Self) {
-        for (lhs, rhs) in self.coefficients.iter_mut().zip(other.coefficients.iter()) {
+        for (lhs, rhs) in self.coefs.iter_mut().zip(other.coefs.iter()) {
             *lhs += *rhs;
         }
     }
@@ -235,7 +235,7 @@ impl Mul<NttElement> for NttElement {
 
 impl fmt::Debug for NttElement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (index, element) in self.coefficients.iter().enumerate() {
+        for (index, element) in self.coefs.iter().enumerate() {
             // adjust for spacing between rows
             write!(f, "{:<8}", element.val())?;
             // Adjust for modulus for row width

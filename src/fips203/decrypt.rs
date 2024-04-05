@@ -3,11 +3,16 @@ use crate::{
         ml_kem_constants::{C2_SIZE, ENCODE_10, ENCODE_12},
         parameter_sets::ParameterSet,
     },
-    math::{ntt_element::NttElement, ring_element::RingElement},
+    math::{
+        encoding::{Compress, Encode},
+        ntt_element::NttElement,
+        ring_element::RingElement,
+    },
     Secret,
 };
 use alloc::vec::Vec;
 use typenum::Unsigned;
+use typenum::U1;
 
 impl<P: ParameterSet + Copy> Secret<P> {
     // TODO: make this return an error and handle them internally
@@ -16,8 +21,9 @@ impl<P: ParameterSet + Copy> Secret<P> {
         let mut u: Vec<RingElement> = Vec::new();
         for _ in 0..P::K::to_usize() {
             let (current, next) = slice.split_at(ENCODE_10);
-            // TODO: this should be generic for du
-            let f = RingElement::decode_and_decompress_10(current).unwrap();
+            let mut f: RingElement = Encode::<P::Du>::decode(current);
+            f.decompress::<P::Du>();
+
             u.push(f);
             slice = next;
         }
@@ -26,23 +32,23 @@ impl<P: ParameterSet + Copy> Secret<P> {
         let mut s_hat: Vec<NttElement> = Vec::new();
         for _ in 0..P::K::to_usize() {
             let (current, next) = slice.split_at(ENCODE_12);
+            // let mut f: NttElement = Encode::<U12>::decode(current);
+            // f.decompress::<U12>();
             let f = NttElement::byte_decode_12(current).unwrap();
             s_hat.push(f);
             slice = next;
         }
 
-        // TODO: handle this error
-        // TODO: this should be generic for dv but it might be already
-        let v = RingElement::decode_and_decompress_4(&c[c.len() - C2_SIZE..c.len()]).unwrap();
+        let mut v: RingElement = Encode::<P::Dv>::decode(&c[c.len() - C2_SIZE..c.len()]);
+        v.decompress::<P::Dv>();
 
         let mut y = RingElement::zero();
         for i in 0..s_hat.len() {
             y += (s_hat[i] * u[i].into()).into();
         }
 
-        let w = v - y;
-        let mut s = [0_u8; 32];
-        w.compress_and_encode_1(&mut s);
+        let mut w = v - y;
+        let s = Encode::<U1>::encode(w.compress::<U1>());
         s.to_vec()
     }
 }

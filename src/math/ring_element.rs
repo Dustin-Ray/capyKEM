@@ -1,7 +1,6 @@
-use crate::constants::ml_kem_constants::{n, q, ENCODE_10};
+use crate::constants::ml_kem_constants::n;
 use crate::math::field_element::FieldElement as F;
 
-use alloc::vec::Vec;
 use core::fmt;
 use core::iter::Sum;
 use core::ops::AddAssign;
@@ -28,112 +27,6 @@ impl RingElement {
         [F::new(0); n].into()
     }
 
-    pub fn decode_decompress_1(b: &[u8]) -> Result<Self, &'static str> {
-        // TODO: check fips203 for length check requirement
-        let coefs: [F; n] = (0..n)
-            .map(|i| {
-                let bit = (b[i / 8] >> (i % 8)) & 1; // Extract the i-th bit
-                F::new(bit as u16 * q / 2)
-            })
-            .collect::<Vec<F>>()
-            .try_into()
-            .unwrap_or_else(|_| panic!("Incorrect vector size, expected 256 elements"));
-        Ok(RingElement { coefs })
-    }
-
-    pub fn decode_and_decompress_10(b: &[u8]) -> Result<Self, &'static str> {
-        let mut f = RingElement {
-            coefs: [F::zero(); n],
-        };
-        let mut x: u64;
-        let mut slice = b;
-
-        for i in (0..n).step_by(4) {
-            x = u64::from(slice[0])
-                | u64::from(slice[1]) << 8
-                | u64::from(slice[2]) << 16
-                | u64::from(slice[3]) << 24
-                | u64::from(slice[4]) << 32;
-            slice = &slice[5..]; // Move the slice window
-
-            f.coefs[i] = F::decompress::<10>((x & 0x3FF) as u16);
-            f.coefs[i + 1] = F::decompress::<10>((x >> 10 & 0x3FF) as u16);
-            f.coefs[i + 2] = F::decompress::<10>((x >> 20 & 0x3FF) as u16);
-            f.coefs[i + 3] = F::decompress::<10>((x >> 30 & 0x3FF) as u16);
-        }
-
-        Ok(f)
-    }
-
-    pub fn decode_and_decompress_4(b: &[u8]) -> Result<Self, &'static str> {
-        if b.len() != 128 {
-            return Err("invalid encoding length");
-        }
-
-        let mut f = RingElement {
-            coefs: [F::zero(); n],
-        }; // Assuming n and F::zero() are defined
-        let mut index = 0;
-
-        for chunk in b.iter() {
-            if index >= f.coefs.len() {
-                break; // Prevents out-of-bounds access if n is not exactly double b's length
-            }
-
-            // Decompress the lower 4 bits
-            f.coefs[index] = F::decompress::<4>(((*chunk) & 0x0F) as u16);
-            index += 1;
-
-            // Check if we should also process the upper 4 bits
-            if index < f.coefs.len() {
-                // Decompress the upper 4 bits
-                f.coefs[index] = F::decompress::<4>(((*chunk) >> 4) as u16);
-                index += 1;
-            }
-        }
-
-        Ok(f)
-    }
-
-    pub fn compress_and_encode_10(mut s: Vec<u8>, f: Self) -> Vec<u8> {
-        s.reserve(ENCODE_10);
-
-        for i in (0..f.coefs.len()).step_by(4) {
-            let mut x: u64 = 0;
-            for j in 0..4 {
-                if i + j < f.coefs.len() {
-                    let shift = j * 10;
-                    x |= (F::compress::<10>(&f.coefs[i + j]) as u64) << shift;
-                }
-            }
-            for shift in (0..40).step_by(8) {
-                s.push(((x >> shift) & 0xFF) as u8);
-            }
-        }
-
-        s
-    }
-
-    pub fn compress_and_encode_4(mut s: Vec<u8>, f: Self) -> Vec<u8> {
-        s.reserve(128);
-
-        for i in (0..n).step_by(2) {
-            let compressed_pair = F::compress::<4>(&f.coefs[i]) as u8
-                | (F::compress::<4>(&f.coefs[i + 1]) as u8) << 4;
-            s.push(compressed_pair);
-        }
-        s
-    }
-
-    pub fn compress_and_encode_1(&self, s: &mut [u8]) {
-        for (i, coef) in self.coefs.iter().enumerate() {
-            let compressed = F::compress::<1>(coef) as u8;
-            let byte_index = i / 8;
-            let bit_index = i % 8;
-
-            s[byte_index] |= compressed << bit_index;
-        }
-    }
     // TODO: make eta const/generic
     pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();

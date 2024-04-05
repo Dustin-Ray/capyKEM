@@ -25,6 +25,8 @@ impl<P: ParameterSet + Copy> Secret<P> {
         for i in 0..t_hat.len() {
             t_hat[i] =
                 NttElement::byte_decode_12(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12]).unwrap();
+            // Encode::<U12>::decode(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12]);
+            // t_hat[i].decompress::<U12>();
         }
 
         let rho: &[u8] = &ek_pke[ENCODE_12 * k..(ENCODE_12 * k) + 32];
@@ -77,12 +79,14 @@ impl<P: ParameterSet + Copy> Secret<P> {
         v += mu;
 
         let mut c: Vec<u8> = Vec::new();
-        for f in u.iter_mut() {
-            c = RingElement::compress_and_encode_10(c, *f);
-            // c.append(&mut Encode::<P::Du>::encode(f.compress::<P::Du>()));
+
+        for ring in u.iter_mut() {
+            let bytes = &mut Encode::<P::Du>::encode(ring.compress::<P::Du>());
+            c.append(bytes);
         }
-        c = RingElement::compress_and_encode_4(c, v);
-        // c.append(&mut Encode::<P::Du>::encode(v.compress::<P::Du>()));
+
+        c.append(&mut Encode::<P::Dv>::encode(v.compress::<P::Dv>()));
+
         c
     }
 }
