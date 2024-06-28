@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, RngCore};
     use capykem::{constants::parameter_sets::KEM_768, Decrypt, Encrypt, Secret};
+    use rand::{thread_rng, RngCore};
 
     #[test]
     fn roundtrip() {
