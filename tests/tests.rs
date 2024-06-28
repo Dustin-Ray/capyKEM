@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use capyKEM::{constants::parameter_sets::KEM_768, Decrypt, Encrypt, Secret};
+    use capy_kem::{constants::parameter_sets::KEM_768, Decrypt, Encrypt, Secret};
     use rand::{thread_rng, RngCore};
 
     #[test]

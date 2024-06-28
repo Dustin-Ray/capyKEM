@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "capyKEM"
+name = "capy_kem"
 version = "0.1.5"
 dependencies = [
  "hybrid-array",
