@@ -18,7 +18,7 @@ pub mod math;
 /// that will be exchanged via encapsulation/decapsulation.
 /// It is defined over generic parameter set defined
 /// by NIST of various security levels.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Secret<P> {
     pub s: [u8; 32],
     _marker: PhantomData<P>,
