@@ -1,3 +1,3 @@
-mod decrypt;
-mod encrypt;
-mod keygen;
+pub mod decrypt;
+pub mod encrypt;
+pub mod keygen;
