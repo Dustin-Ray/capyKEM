@@ -1,5 +1,5 @@
 [package]
-name = "capykem"
+name = "capyKEM"
 version = "0.1.0"
 edition = "2021"
 description = "Exercise in quantum-resistant cryptographic algorithm design."
