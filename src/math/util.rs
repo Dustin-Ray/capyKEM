@@ -1,4 +1,5 @@
 /// Safely truncate an unsigned integer value to shorter representation
+#[allow(unused)]
 pub trait Truncate<T> {
     fn truncate(self) -> T;
 }

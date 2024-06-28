@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use hybrid_array::typenum::Unsigned;
 
 use hybrid_array::typenum::{
@@ -42,7 +43,7 @@ where
     type ValueStep = Quot<EncodingUnit<D>, D>;
     type ByteStep = Quot<EncodingUnit<D>, U8>;
 }
-pub type Integer = u16;
+type Integer = u16;
 fn byte_decode<D: EncodingSize>(bytes: &[u8]) -> RingElement {
     let val_step = D::ValueStep::USIZE;
     let byte_step = D::ByteStep::USIZE;

@@ -67,7 +67,7 @@ impl<P: ParameterSet + Copy> Secret<P> {
             })
             .collect();
 
-        let mut mu: RingElement = Encode::<U1>::decode(&self.m);
+        let mut mu: RingElement = Encode::<U1>::decode(&self.s);
         mu.decompress::<U1>();
 
         let mut v = NttElement::zero();

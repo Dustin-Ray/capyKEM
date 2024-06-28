@@ -2,6 +2,8 @@
 
 This repo is a pure rust, no-std interpretation of [FIPS 203 (draft)](https://csrc.nist.gov/pubs/fips/203/ipd) which leverages a module learning-with-errors based construction aimed towards providing a secure means of key exchange when faced with a potential quantum adversary.
 
+THIS LIBRARY IS A DRAFT AND IS NOT SAFE FOR USE. It exists purely for acedemic exeperimentation.
+
 ### Current working items:
 
 - [ ] document in style of FIPS

@@ -22,7 +22,7 @@ pub struct NttElement {
 }
 
 impl NttElement {
-    pub fn new(r: &mut RingElement) -> Self {
+    fn new(r: &mut RingElement) -> Self {
         let mut ntt_el = NttElement { coefs: r.coefs };
         ntt_el.ntt();
         ntt_el
