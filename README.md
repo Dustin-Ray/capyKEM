@@ -102,6 +102,10 @@ and pass ^s instead of dk_PKE to K-PKE.Decrypt (line 7); and ^A, ^t instead of e
 
 8. Change ML-KEM.Encaps to include the lines 2–8 removed from K-PKE.Encrypt before the call to K-PKE.Encrypt, to which ^A and ^t are passed instead of ek_PKE.
 
-## Thoughts
+## (Plausible) Post-Quantum Security
+This library pairs ML-KEM-768 to a SHA3-sponge construction for a quantum-safe public-key cryptosystem. It offers theoretic quantum-security through the use of the KEM and sponge primitives, which are both based on problems conjectured to be hard to solve for a quantum adversary. This design seeds the SHA-3 sponge with the secret shared through the KEM + a session nonce, which then faciliates high-performance symmetric encryption/decryption of arbitrary-length messages.
 
-What are the feelings around this? Is this update needed currently? This announcement is recent but I thought it would be worth bringing up sooner than later.
+Our construction is non-standard, has not been subject to peer review, and lacks any formal audit. Our [ML-KEM library](https://github.com/drcapybara/capyKEM) itself is a work in progress and only supports the recommended NIST-II security parameter-set of 768. Furthermore, the current FIPS 203 IPD is, (as the name indicates), a draft, and final details about secure implementation may be subject to change. Our design currently exists in this library purely as an academic curiosity. Use it at your own risk, we provide no guarantee of security, reliability, or efficiency.
+
+## Acknowledgements
+Our [KEM](https://github.com/drcapybara/capyKEM) is inspired by the excellent ML-KEM articles and [go implementation](https://pkg.go.dev/filippo.io/mlkem768) by Filippo Valsorda and the always wonderful rust-crypto implementation by the great Tony Arcieri [here](https://crates.io/crates/ml-kem).
