@@ -6,12 +6,13 @@ THIS LIBRARY IS A DRAFT AND IS NOT SAFE FOR USE. It exists purely for acedemic e
 
 ### Current working items:
 
+
+- [x] condense encoding/decoding to single function
+- [x] parameterize encoding/decoding over d
+- [x] implement API-level functions
 - [ ] document in style of FIPS
 - [ ] support other two parameter sets
 - [ ] parameterize sample_poly_cbd over eta
-- [x] condense encoding/decoding to single function
-- [x] parameterize encoding/decoding over d
-- [ ] implement API-level functions
 - [ ] replace usage of ```Vec``` with ```hybridarray```
 
 
