@@ -8,8 +8,8 @@ use crate::{
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_512};
-
 use rand::{thread_rng, RngCore};
+
 /// Represents a private key for Key Encapsulation Mechanism (KEM).
 ///
 /// This structure holds the private decryption key (`dk`)
@@ -20,7 +20,7 @@ use rand::{thread_rng, RngCore};
 /// essential for decrypting the KEM ciphertext.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct KEMPrivateKey {
-    pub dk_ek_h_ek_z: Vec<u8>,
+    pub dk: Vec<u8>,
 }
 
 /// Represents a public key for Key Encapsulation Mechanism (KEM).
@@ -48,30 +48,34 @@ pub struct KEMPublicKey {
 ///
 /// It initializes the necessary randomness and calls the library-specific key generation
 /// function to produce both encryption and decryption keys.
-///
-/// ## Returns
-/// Returns a tuple containing:
-/// * `KEMPublicKey`: Contains the public encryption key and initial random bytes.
-/// * `KEMPrivateKey`: Contains the private decryption key.
 pub fn ml_kem_keygen<P: ParameterSet>() -> (KEMPublicKey, KEMPrivateKey) {
     let mut rng = thread_rng();
     let mut z = [0u8; 32];
 
-    // generate randomness for the KEM
+    // Generate randomness for the KEM
     rng.fill_bytes(&mut z);
-    let (ek, mut dk_ek_h_ek_z) = k_pke_keygen::<P>(&z);
+    let (ek, mut dk) = k_pke_keygen::<P>(&z);
 
-    let mut hasher = Sha3_512::default();
-    hasher.update(&ek);
-    let binding = hasher.finalize();
-    let h_ek = &binding.as_slice()[0..32];
+    let h_ek = hash_ek(&ek);
 
     // Concatenate dk, ek, h_ek, and z into a single Vec<u8>
-    dk_ek_h_ek_z.extend_from_slice(&ek);
-    dk_ek_h_ek_z.extend_from_slice(h_ek);
-    dk_ek_h_ek_z.extend_from_slice(&z);
+    pack_dk(&mut dk, &ek, &h_ek, &z);
 
-    (KEMPublicKey { ek }, KEMPrivateKey { dk_ek_h_ek_z })
+    (KEMPublicKey { ek }, KEMPrivateKey { dk })
+}
+
+/// Hashes the encryption key and returns the first 32 bytes of the hash
+fn hash_ek(ek: &[u8]) -> Vec<u8> {
+    let mut hasher = Sha3_512::default();
+    hasher.update(ek);
+    hasher.finalize().as_slice()[0..32].to_vec()
+}
+
+/// Concatenates dk, ek, h_ek, and z into dk
+fn pack_dk(dk: &mut Vec<u8>, ek: &[u8], h_ek: &[u8], z: &[u8]) {
+    dk.extend_from_slice(ek);
+    dk.extend_from_slice(h_ek);
+    dk.extend_from_slice(z);
 }
 
 // TODO: parameterize this

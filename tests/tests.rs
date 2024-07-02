@@ -9,11 +9,11 @@ mod tests {
     #[test]
     #[allow(non_snake_case)]
     fn roundtrip() {
-        let (ek, dk_pke) = ml_kem_keygen::<KEM_768>(); // Generate key pair
+        let (ek_pke, dk_pke) = ml_kem_keygen::<KEM_768>(); // Generate key pair
 
-        let (K, c) = mlkem_encaps::<KEM_768>(&ek.ek).unwrap();
+        let (K, c) = mlkem_encaps::<KEM_768>(&ek_pke.ek).unwrap();
 
-        let dec = mlkem_decaps::<KEM_768>(&c, &dk_pke.dk_ek_h_ek_z);
+        let dec = mlkem_decaps::<KEM_768>(&c, &dk_pke.dk);
         // Assert that the decrypted message matches the original message
         assert_eq!(dec, K);
     }
