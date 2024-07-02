@@ -1,6 +1,6 @@
 use crate::{
     constants::{
-        ml_kem_constants::{self, ENCODE_12},
+        ml_kem_constants::{k, ENCODE_12},
         parameter_sets::ParameterSet,
     },
     math::{
@@ -10,20 +10,58 @@ use crate::{
     },
 };
 use alloc::vec::Vec;
+use rand::{thread_rng, RngCore};
+use sha3::{Digest, Sha3_512};
 use typenum::U1;
 
-pub fn k_pke_encrypt<P: ParameterSet + Copy>(s: &[u8], ek_pke: &[u8], rand: &[u8; 32]) -> Vec<u8> {
-    // TODO: parameterize this
-    const k: usize = ml_kem_constants::k;
+#[allow(non_snake_case)]
+pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    const REQUIRED_EK_LENGTH: usize = ENCODE_12 * k + 32;
+
+    // Step 1. Validate the key
+    if ek.len() != REQUIRED_EK_LENGTH {
+        return Err("Key length validation failed".to_string());
+    }
+
+    // Step 3. Generate 32 random bytes (see Section 3.3)
+    let mut rng = thread_rng();
+    let mut m = [0_u8; 32];
+    rng.fill_bytes(&mut m);
+
+    // Step 4. Compute hash of encryption key
+    let h_ek = hash_to_slice(ek, 32);
+
+    // Step 5. Concatenate m and h_ek, and hash to derive K and r
+    let (K, r) = derive_keys(&m, &h_ek);
+
+    // Step 6. Encrypt the message
+    let c = k_pke_encrypt::<P>(ek, &m, &r);
+
+    Ok((K.to_vec(), c))
+}
+
+fn hash_to_slice(data: &[u8], slice_size: usize) -> Vec<u8> {
+    let mut hasher = Sha3_512::default();
+    hasher.update(data);
+    hasher.finalize().as_slice()[0..slice_size].to_vec()
+}
+
+#[allow(non_snake_case)]
+fn derive_keys(m: &[u8; 32], h_ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    let mut hasher = Sha3_512::default();
+    hasher.update(m);
+    hasher.update(h_ek);
+    let binding = hasher.finalize();
+    let (K, r) = binding.as_slice().split_at(32);
+    (K.to_vec(), r.to_vec())
+}
+
+pub(crate) fn k_pke_encrypt<P: ParameterSet>(ek_pke: &[u8], m: &[u8], rand: &[u8]) -> Vec<u8> {
     let mut n = 0;
-    // handle this error
     let mut t_hat = [NttElement::zero(); k];
 
-    // TODO: parameterize 384 as encodesize12
     for i in 0..t_hat.len() {
         t_hat[i] = NttElement::byte_decode_12(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12]).unwrap();
-        // Encode::<U12>::decode(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12]);
-        // t_hat[i].decompress::<U12>();
     }
 
     let rho: &[u8] = &ek_pke[ENCODE_12 * k..(ENCODE_12 * k) + 32];
@@ -64,7 +102,7 @@ pub fn k_pke_encrypt<P: ParameterSet + Copy>(s: &[u8], ek_pke: &[u8], rand: &[u8
         })
         .collect();
 
-    let mut mu: RingElement = Encode::<U1>::decode(s);
+    let mut mu: RingElement = Encode::<U1>::decode(m);
     mu.decompress::<U1>();
 
     let mut v = NttElement::zero();
