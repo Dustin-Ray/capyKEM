@@ -17,49 +17,55 @@ use typenum::U1;
 use super::encrypt::k_pke_encrypt;
 
 pub fn mlkem_decaps<P: ParameterSet>(c: &[u8], dk: &[u8]) -> Vec<u8> {
-    let k = P::K::to_usize();
+    // Extract key sections based on parameter k
+    let (dk_pke, ek_pke, h, z) = unpack_dk::<P>(dk);
 
-    // extract (from KEM decaps key) the PKE decryption key
-    let dk_pke = &dk[0..ENCODE_12 * k];
-
-    // extract PKE encryption key
-    let ek_pke = &dk[ENCODE_12 * k..768 * k + 32];
-
-    // extract hash of PKE encryption key
-    let h = &dk[768 * k + 32..768 * k + 64];
-
-    // extract implicit rejection value
-    let z = &dk[768 * k + 64..768 * k + 96];
-
-    // decrypt ciphertex
+    // Decrypt ciphertext
     let m_prime = k_pke_decrypt::<P>(dk_pke, c);
 
-    // (K', r') ← G(m ∥ h)
-    let mut hasher = Sha3_512::default();
-    let mut m_prime_h = m_prime.to_vec();
+    // Derive K' and r' from m_prime and h
+    let (mut k_prime, r_prime) = derive_keys(&m_prime, h);
 
-    m_prime_h.extend_from_slice(h);
-    hasher.update(&m_prime_h);
-    let binding = hasher.finalize();
-    let binding = binding.as_slice().to_vec();
-    let (mut k_prime, r_prime) = binding.split_at(32);
+    // Compute K̄ from z and c
+    let k_bar = compute_k_bar(z, c);
 
-    // K̄ ← J(z∥c, 32)
-    let mut hasher = Sha3_512::default();
-    z.to_vec().extend_from_slice(c);
-    hasher.update(z);
-    let binding = hasher.finalize();
-    let k_bar = &binding.as_slice()[0..32];
-
-    // re-encrypt using the derived randomness r′
-    let c_prime = k_pke_encrypt::<P>(ek_pke, &m_prime, r_prime);
+    // Re-encrypt using derived randomness r' and check ciphertext match
+    let c_prime = k_pke_encrypt::<P>(ek_pke, &m_prime, &r_prime);
     if c != c_prime {
-        k_prime = k_bar; // if ciphertexts do not match, “implicitly reject”
+        k_prime = k_bar; // If ciphertexts do not match, "implicitly reject"
     }
-    k_prime.to_vec()
+
+    k_prime
 }
 
-// TODO: make this return an error and handle them internally
+// Extracts keys from dk based on the size multiplier k
+fn unpack_dk<P: ParameterSet>(dk: &[u8]) -> (&[u8], &[u8], &[u8], &[u8]) {
+    let k = P::K::to_usize();
+    let dk_pke = &dk[0..ENCODE_12 * k];
+    let ek_pke = &dk[ENCODE_12 * k..768 * k + 32];
+    let h = &dk[768 * k + 32..768 * k + 64];
+    let z = &dk[768 * k + 64..768 * k + 96];
+    (dk_pke, ek_pke, h, z)
+}
+
+// Derive K' and r' using SHA3-512 hasher
+fn derive_keys(m_prime: &[u8], h: &[u8]) -> (Vec<u8>, Vec<u8>) {
+    let mut hasher = Sha3_512::default();
+    hasher.update(m_prime);
+    hasher.update(h);
+    let binding = hasher.finalize().as_slice().to_vec();
+    let (k_prime, r_prime) = binding.split_at(32);
+    (k_prime.to_vec(), r_prime.to_vec())
+}
+
+// Compute K̄ using SHA3-512 hasher
+fn compute_k_bar(z: &[u8], c: &[u8]) -> Vec<u8> {
+    let mut hasher = Sha3_512::default();
+    hasher.update(z);
+    hasher.update(c);
+    hasher.finalize().as_slice()[0..32].to_vec()
+}
+
 fn k_pke_decrypt<P: ParameterSet>(dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
     let mut slice = c;
     let mut u: Vec<RingElement> = Vec::new();

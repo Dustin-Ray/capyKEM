@@ -23,6 +23,8 @@ pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), St
         return Err("Key length validation failed".to_string());
     }
 
+    // Step 2. TODO: modulus check
+
     // Step 3. Generate 32 random bytes (see Section 3.3)
     let mut rng = thread_rng();
     let mut m = [0_u8; 32];
@@ -37,7 +39,7 @@ pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), St
     // Step 6. Encrypt the message
     let c = k_pke_encrypt::<P>(ek, &m, &r);
 
-    Ok((K.to_vec(), c))
+    Ok((K, c))
 }
 
 fn hash_to_slice(data: &[u8], slice_size: usize) -> Vec<u8> {
