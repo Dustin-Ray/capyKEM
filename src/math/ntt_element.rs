@@ -37,7 +37,8 @@ impl NttElement {
     pub fn sample_ntt(rho: &[u8], ii: usize, jj: usize) -> NttElement {
         let mut hasher = Shake128::default();
         hasher.update(rho);
-        hasher.update(&[ii.try_into().unwrap(), jj.try_into().unwrap()]);
+        hasher.update(ii.to_le_bytes().as_slice());
+        hasher.update(jj.to_le_bytes().as_slice());
 
         let mut reader = hasher.finalize_xof();
 

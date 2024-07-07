@@ -4,7 +4,7 @@ use crate::{
         parameter_sets::ParameterSet,
     },
     math::{
-        encoding::{Compress, Encode},
+        encoding::{byte_decode, byte_encode, Compress, Encode},
         ntt_element::NttElement,
         ring_element::RingElement,
     },
@@ -21,8 +21,17 @@ pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), St
         return Err("Key length validation failed".into());
     }
 
-    // Step 2. TODO: modulus check ek~ <- ByteEncode12(ByteDecode12(ek))
-    // assert!(ek_tilde == ek);
+    // Step 2. modulus check ek~ <- ByteEncode12(ByteDecode12(ek))
+    // TODO: this is wrong, the entire things should be equal, not portions
+    // TODO: make this fixed-time
+    let ek_decoded = byte_decode::<P::Encode12>(ek);
+    let ek_encoded = byte_encode::<P::Encode12>(&ek_decoded.coefs);
+    assert_eq!(ek[0..384], ek_encoded);
+
+    if ek_encoded != ek[0..384] {
+        // Compare byte-wise
+        return Err("Modulus check failed: Key is not consistent after encode-decode cycle".into());
+    }
 
     // Step 3. Generate 32 random bytes (see Section 3.3)
     let mut rng = thread_rng();
@@ -57,7 +66,11 @@ fn derive_keys(m: &[u8; 32], h_ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
     (K.to_vec(), r.to_vec())
 }
 
-pub(crate) fn k_pke_encrypt<P: ParameterSet>(ek_pke: &[u8], m: &[u8], rand: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn k_pke_encrypt<P: ParameterSet>(
+    ek_pke: &[u8],
+    m: &[u8],
+    rand: &[u8],
+) -> Result<Vec<u8>, String> {
     let mut n = 0;
     let mut t_hat = [NttElement::zero(); k];
 

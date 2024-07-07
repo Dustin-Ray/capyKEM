@@ -18,6 +18,8 @@ pub mod ml_kem_constants {
 #[allow(non_camel_case_types)]
 // appendix table 2
 pub mod parameter_sets {
+    use crate::math::encoding::EncodingSize;
+    use typenum::{Unsigned, U10, U11, U12, U16, U2, U3, U4, U5, U9};
 
     pub trait ParameterSet {
         // Define each parameter as an associated type.
@@ -27,10 +29,9 @@ pub mod parameter_sets {
         type EtaTwo: Unsigned;
         type Du: EncodingSize;
         type Dv: EncodingSize;
+        type Encode12: EncodingSize;
     }
 
-    use crate::math::encoding::EncodingSize;
-    use typenum::{Unsigned, U10, U11, U16, U2, U3, U4, U5, U9};
     #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct KEM_512;
     impl ParameterSet for KEM_512 {
@@ -40,6 +41,7 @@ pub mod parameter_sets {
         type EtaTwo = U2;
         type Du = U10;
         type Dv = U4;
+        type Encode12 = U12;
     }
     #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct KEM_768;
@@ -50,6 +52,7 @@ pub mod parameter_sets {
         type EtaTwo = U2;
         type Du = U10;
         type Dv = U4;
+        type Encode12 = U12;
     }
     #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct KEM_1024;
@@ -60,6 +63,7 @@ pub mod parameter_sets {
         type EtaTwo = U2;
         type Du = U11;
         type Dv = U5;
+        type Encode12 = U12;
     }
 }
 

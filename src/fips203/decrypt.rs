@@ -21,7 +21,7 @@ pub fn mlkem_decaps<P: ParameterSet>(c: &[u8], dk: &[u8]) -> Result<Vec<u8>, Str
     let (dk_pke, ek_pke, h, z) = unpack_dk::<P>(dk);
 
     // Decrypt ciphertext
-    let m_prime = k_pke_decrypt::<P>(dk_pke, c);
+    let m_prime = k_pke_decrypt::<P>(dk_pke, c)?;
 
     // Derive K' and r' from m_prime and h
     let (mut k_prime, r_prime) = derive_keys(&m_prime, h);
@@ -68,7 +68,7 @@ fn compute_k_bar(z: &[u8], c: &[u8]) -> Vec<u8> {
 
 // FIPS 203 Section 5.3 Algorithm 14
 // Uses the decryption key to decrypt a ciphertext.
-fn k_pke_decrypt<P: ParameterSet>(dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
+fn k_pke_decrypt<P: ParameterSet>(dk_pke: &[u8], c: &[u8]) -> Result<Vec<u8>, String> {
     let mut slice = c;
     let mut u: Vec<RingElement> = Vec::new();
     for _ in 0..P::K::to_usize() {
@@ -84,7 +84,7 @@ fn k_pke_decrypt<P: ParameterSet>(dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
     let mut s_hat: Vec<NttElement> = Vec::new();
     for _ in 0..P::K::to_usize() {
         let (current, next) = slice.split_at(ENCODE_12);
-        let f = NttElement::byte_decode_12(current).unwrap();
+        let f = NttElement::byte_decode_12(current)?;
         s_hat.push(f);
         slice = next;
     }
@@ -99,5 +99,5 @@ fn k_pke_decrypt<P: ParameterSet>(dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
 
     let mut w = v - y;
     let s = Encode::<U1>::encode(w.compress::<U1>());
-    s.to_vec()
+    Ok(s)
 }

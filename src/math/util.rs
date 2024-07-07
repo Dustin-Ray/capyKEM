@@ -1,29 +1,3 @@
-/// Safely truncate an unsigned integer value to shorter representation
-#[allow(unused)]
-pub trait Truncate<T> {
-    fn truncate(self) -> T;
-}
-
-macro_rules! define_truncate {
-    ($from:ident, $to:ident) => {
-        impl Truncate<$to> for $from {
-            fn truncate(self) -> $to {
-                // This line is marked unsafe because the `unwrap_unchecked` call is UB when its
-                // `self` argument is `Err`.  It never will be, because we explicitly zeroize the
-                // high-order bits before converting.  We could have used `unwrap()`, but chose to
-                // avoid the possibility of panic.
-                unsafe { (self & $from::from($to::MAX)).try_into().unwrap_unchecked() }
-            }
-        }
-    };
-}
-
-define_truncate!(u32, u16);
-define_truncate!(u64, u32);
-define_truncate!(usize, u8);
-define_truncate!(u128, u16);
-define_truncate!(u128, u8);
-
 #[cfg(test)]
 mod tests {
 

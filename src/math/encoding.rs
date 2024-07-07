@@ -39,7 +39,7 @@ where
 
 type Integer = u16;
 
-fn byte_decode<D: EncodingSize>(bytes: &[u8]) -> RingElement {
+pub fn byte_decode<D: EncodingSize>(bytes: &[u8]) -> RingElement {
     let val_step = D::ValueStep::USIZE;
     let byte_step = D::ByteStep::USIZE;
     let mask = (1u128 << D::USIZE) - 1;
@@ -69,7 +69,7 @@ fn byte_decode<D: EncodingSize>(bytes: &[u8]) -> RingElement {
     vals
 }
 
-fn byte_encode<D: EncodingSize>(vals: &[FieldElement; 256]) -> Vec<u8> {
+pub fn byte_encode<D: EncodingSize>(vals: &[FieldElement; 256]) -> Vec<u8> {
     let val_step = D::ValueStep::USIZE;
     let byte_step = D::ByteStep::USIZE;
 
