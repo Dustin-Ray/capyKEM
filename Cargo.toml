@@ -1,8 +1,8 @@
 [package]
 name = "capy_kem"
-version = "0.1.7"
+version = "0.1.9"
 edition = "2021"
-description = "Exercise in quantum-resistant cryptographic algorithm design."
+description = "ML-KEM with MAL-BIND Security."
 license = "MIT"
 
 
