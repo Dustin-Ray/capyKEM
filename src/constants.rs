@@ -29,9 +29,8 @@ pub mod parameter_sets {
         type Dv: EncodingSize;
     }
 
-    use typenum::{Unsigned, U10, U11, U16, U2, U3, U4, U5, U9};
-
     use crate::math::encoding::EncodingSize;
+    use typenum::{Unsigned, U10, U11, U16, U2, U3, U4, U5, U9};
     #[derive(Clone, Copy, PartialEq, Debug)]
     pub struct KEM_512;
     impl ParameterSet for KEM_512 {

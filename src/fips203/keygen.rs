@@ -6,9 +6,9 @@ use crate::{
     math::{ntt_element::NttElement, ring_element::RingElement},
 };
 use alloc::vec::Vec;
+use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_512};
-use rand::{thread_rng, RngCore};
 
 /// Represents a private key for Key Encapsulation Mechanism (KEM).
 ///

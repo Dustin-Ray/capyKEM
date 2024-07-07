@@ -1,3 +1,4 @@
+use super::encrypt::k_pke_encrypt;
 use crate::{
     constants::{
         ml_kem_constants::{C2_SIZE, ENCODE_10, ENCODE_12},
@@ -9,15 +10,14 @@ use crate::{
         ring_element::RingElement,
     },
 };
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use sha3::{Digest, Sha3_512};
-use typenum::Unsigned;
-use typenum::U1;
+use typenum::{Unsigned, U1};
 
-use super::encrypt::k_pke_encrypt;
-
-pub fn mlkem_decaps<P: ParameterSet>(c: &[u8], dk: &[u8]) -> Vec<u8> {
-    // Extract key sections based on parameter k
+/// FIPS 203 Section 6.3, Algorithm 17
+/// Uses the decapsulation key to produce a shared key from a ciphertext.
+pub fn mlkem_decaps<P: ParameterSet>(c: &[u8], dk: &[u8]) -> Result<Vec<u8>, String> {
+    // Unpack the key based on parameter k
     let (dk_pke, ek_pke, h, z) = unpack_dk::<P>(dk);
 
     // Decrypt ciphertext
@@ -30,12 +30,12 @@ pub fn mlkem_decaps<P: ParameterSet>(c: &[u8], dk: &[u8]) -> Vec<u8> {
     let k_bar = compute_k_bar(z, c);
 
     // Re-encrypt using derived randomness r' and check ciphertext match
-    let c_prime = k_pke_encrypt::<P>(ek_pke, &m_prime, &r_prime);
+    let c_prime = k_pke_encrypt::<P>(ek_pke, &m_prime, &r_prime)?;
     if c != c_prime {
         k_prime = k_bar; // If ciphertexts do not match, "implicitly reject"
     }
 
-    k_prime
+    Ok(k_prime)
 }
 
 // Extracts keys from dk based on the size multiplier k
@@ -66,6 +66,8 @@ fn compute_k_bar(z: &[u8], c: &[u8]) -> Vec<u8> {
     hasher.finalize().as_slice()[0..32].to_vec()
 }
 
+// FIPS 203 Section 5.3 Algorithm 14
+// Uses the decryption key to decrypt a ciphertext.
 fn k_pke_decrypt<P: ParameterSet>(dk_pke: &[u8], c: &[u8]) -> Vec<u8> {
     let mut slice = c;
     let mut u: Vec<RingElement> = Vec::new();

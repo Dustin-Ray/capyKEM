@@ -1,22 +1,15 @@
+use super::{field_element::FieldElement, ntt_element::NttElement, ring_element::RingElement};
+use crate::constants::ml_kem_constants::q;
 use alloc::vec::Vec;
-use hybrid_array::typenum::Unsigned;
-
-use hybrid_array::typenum::{
-    operator_aliases::{Gcf, Prod, Quot},
-    type_operators::Gcd,
-    U32, U8,
-};
-
 use core::{
     fmt::Debug,
     ops::{Div, Mul},
 };
-
-use crate::constants::ml_kem_constants::q;
-
-use super::field_element::FieldElement;
-use super::ntt_element::NttElement;
-use super::ring_element::RingElement;
+use hybrid_array::typenum::{
+    operator_aliases::{Gcf, Prod, Quot},
+    type_operators::Gcd,
+    Unsigned, U32, U8,
+};
 /// An array length with other useful properties
 pub trait ArraySize: hybrid_array::ArraySize + PartialEq + Debug {}
 
@@ -43,7 +36,9 @@ where
     type ValueStep = Quot<EncodingUnit<D>, D>;
     type ByteStep = Quot<EncodingUnit<D>, U8>;
 }
+
 type Integer = u16;
+
 fn byte_decode<D: EncodingSize>(bytes: &[u8]) -> RingElement {
     let val_step = D::ValueStep::USIZE;
     let byte_step = D::ByteStep::USIZE;

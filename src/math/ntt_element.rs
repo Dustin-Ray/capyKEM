@@ -1,13 +1,13 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
-use crate::constants::ml_kem_constants::{n, q, ENCODE_12, MASK_12};
-use crate::constants::{K_MOD_ROOTS, K_NTT_ROOTS};
-
-use alloc::borrow::ToOwned;
-use alloc::string::String;
-use alloc::vec::Vec;
-use core::fmt;
-use core::ops::Add;
-use core::ops::{AddAssign, Mul};
+use crate::constants::{
+    ml_kem_constants::{n, q, ENCODE_12, MASK_12},
+    K_MOD_ROOTS, K_NTT_ROOTS,
+};
+use alloc::{string::String, vec::Vec};
+use core::{
+    fmt,
+    ops::{Add, AddAssign, Mul},
+};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake128,
@@ -154,7 +154,7 @@ impl NttElement {
 
     pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
         if b.len() != (ENCODE_12) {
-            return Err("Invalid encoding length".to_owned());
+            return Err("Invalid encoding length".into());
         }
 
         let mut f = Vec::with_capacity(n);

@@ -1,10 +1,9 @@
-use crate::constants::ml_kem_constants::n;
-use crate::math::field_element::FieldElement as F;
-
-use core::fmt;
-use core::iter::Sum;
-use core::ops::AddAssign;
-use core::ops::{Add, Sub};
+use crate::{constants::ml_kem_constants::n, math::field_element::FieldElement as F};
+use core::{
+    fmt,
+    iter::Sum,
+    ops::{Add, AddAssign, Sub},
+};
 use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake256,

@@ -1,9 +1,9 @@
-use core::ops::{Add, AddAssign, Mul, Neg, Sub};
-
-use crate::constants::barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift};
-use crate::constants::ml_kem_constants::q;
-
 use super::encoding::{Compress, CompressionFactor};
+use crate::constants::{
+    barrett_constants::{MULTIPLIER as bar_mul, SHIFT as bar_shift},
+    ml_kem_constants::q,
+};
+use core::ops::{Add, AddAssign, Mul, Neg, Sub};
 
 pub enum OperationError {
     UnreducedFieldElementError,

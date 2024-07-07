@@ -9,21 +9,20 @@ use crate::{
         ring_element::RingElement,
     },
 };
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use rand::{thread_rng, RngCore};
 use sha3::{Digest, Sha3_512};
 use typenum::U1;
 
 #[allow(non_snake_case)]
 pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
-    const REQUIRED_EK_LENGTH: usize = ENCODE_12 * k + 32;
-
-    // Step 1. Validate the key
-    if ek.len() != REQUIRED_EK_LENGTH {
-        return Err("Key length validation failed".to_string());
+    // Step 1. (Type check) Validate the key length
+    if ek.len() != ENCODE_12 * k + 32 {
+        return Err("Key length validation failed".into());
     }
 
-    // Step 2. TODO: modulus check
+    // Step 2. TODO: modulus check ek~ <- ByteEncode12(ByteDecode12(ek))
+    // assert!(ek_tilde == ek);
 
     // Step 3. Generate 32 random bytes (see Section 3.3)
     let mut rng = thread_rng();
@@ -37,7 +36,7 @@ pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), St
     let (K, r) = derive_keys(&m, &h_ek);
 
     // Step 6. Encrypt the message
-    let c = k_pke_encrypt::<P>(ek, &m, &r);
+    let c = k_pke_encrypt::<P>(ek, &m, &r)?;
 
     Ok((K, c))
 }
@@ -58,12 +57,12 @@ fn derive_keys(m: &[u8; 32], h_ek: &[u8]) -> (Vec<u8>, Vec<u8>) {
     (K.to_vec(), r.to_vec())
 }
 
-pub(crate) fn k_pke_encrypt<P: ParameterSet>(ek_pke: &[u8], m: &[u8], rand: &[u8]) -> Vec<u8> {
+pub(crate) fn k_pke_encrypt<P: ParameterSet>(ek_pke: &[u8], m: &[u8], rand: &[u8]) -> Result<Vec<u8>, String> {
     let mut n = 0;
     let mut t_hat = [NttElement::zero(); k];
 
     for i in 0..t_hat.len() {
-        t_hat[i] = NttElement::byte_decode_12(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12]).unwrap();
+        t_hat[i] = NttElement::byte_decode_12(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12])?;
     }
 
     let rho: &[u8] = &ek_pke[ENCODE_12 * k..(ENCODE_12 * k) + 32];
@@ -124,5 +123,5 @@ pub(crate) fn k_pke_encrypt<P: ParameterSet>(ek_pke: &[u8], m: &[u8], rand: &[u8
 
     c.append(&mut Encode::<P::Dv>::encode(v.compress::<P::Dv>()));
 
-    c
+    Ok(c)
 }

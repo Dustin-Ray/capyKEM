@@ -13,7 +13,7 @@ mod tests {
 
         let (K, c) = mlkem_encaps::<KEM_768>(&ek_pke.ek).unwrap();
 
-        let dec = mlkem_decaps::<KEM_768>(&c, &dk_pke.dk);
+        let dec = mlkem_decaps::<KEM_768>(&c, &dk_pke.dk).unwrap();
         // Assert that the decrypted message matches the original message
         assert_eq!(dec, K);
     }
