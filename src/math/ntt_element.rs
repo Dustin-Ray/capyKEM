@@ -1,9 +1,12 @@
 use super::{field_element::FieldElement as F, ring_element::RingElement};
-use crate::constants::{
-    ml_kem_constants::{n, q, ENCODE_12, MASK_12},
-    K_MOD_ROOTS, K_NTT_ROOTS,
+use crate::{
+    constants::{
+        ml_kem_constants::{n, q, ENCODE_12, MASK_12},
+        K_MOD_ROOTS, K_NTT_ROOTS,
+    },
+    error::{KemError, Result},
 };
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     fmt,
     ops::{Add, AddAssign, Mul},
@@ -19,6 +22,12 @@ use sha3::{
 #[derive(Clone, Copy)]
 pub struct NttElement {
     pub coefs: [F; n],
+}
+
+impl Default for NttElement {
+    fn default() -> Self {
+        Self::zero()
+    }
 }
 
 impl NttElement {
@@ -153,9 +162,9 @@ impl NttElement {
         b
     }
 
-    pub fn byte_decode_12(b: &[u8]) -> Result<Self, String> {
+    pub fn byte_decode_12(b: &[u8]) -> Result<Self> {
         if b.len() != (ENCODE_12) {
-            return Err("Invalid encoding length".into());
+            return Err(KemError::EncodingError);
         }
 
         let mut f = Vec::with_capacity(n);
@@ -165,11 +174,11 @@ impl NttElement {
             let d = u32::from(b[i]) | (u32::from(b[i + 1]) << 8) | (u32::from(b[i + 2]) << 16);
             let elem1 = F::new((d & MASK_12) as u16)
                 .check_reduced()
-                .map_err(|_| "Invalid polynomial encoding")?;
+                .map_err(|_| KemError::EncodingError)?;
 
             let elem2 = F::new((d >> 12) as u16)
                 .check_reduced()
-                .map_err(|_| "Invalid polynomial encoding")?;
+                .map_err(|_| KemError::EncodingError)?;
 
             f.push(elem1);
             f.push(elem2);
@@ -178,7 +187,7 @@ impl NttElement {
         }
         let coefficients: [F; n] = f
             .try_into()
-            .map_err(|_| "Conversion to fixed-size array failed")?;
+            .map_err(|_| KemError::EncodingError)?;
 
         Ok(Self {
             coefs: coefficients,

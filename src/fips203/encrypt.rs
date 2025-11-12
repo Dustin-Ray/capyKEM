@@ -1,40 +1,58 @@
 use crate::{
-    constants::{
-        ml_kem_constants::{k, ENCODE_12},
-        parameter_sets::ParameterSet,
-    },
+    constants::{ml_kem_constants::ENCODE_12, parameter_sets::ParameterSet},
+    error::{KemError, Result},
     math::{
-        encoding::{byte_decode, byte_encode, Compress, Encode},
+        encoding::{Compress, Encode},
         ntt_element::NttElement,
         ring_element::RingElement,
     },
 };
-use alloc::{string::String, vec::Vec};
-use rand::{thread_rng, RngCore};
+use alloc::vec::Vec;
+use hybrid_array::{typenum::Unsigned, Array};
+use rand_core::{CryptoRng, RngCore};
 use sha3::{Digest, Sha3_512};
+use subtle::ConstantTimeEq;
 use typenum::U1;
+use zeroize::Zeroize;
 
+/// Encapsulation with provided RNG
+///
+/// # Security
+/// 
+/// This function performs constant-time comparisons and zeroizes sensitive
+/// intermediate values. The RNG must implement `CryptoRng` for security.
 #[allow(non_snake_case)]
-pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
+pub fn mlkem_encaps<P: ParameterSet, R: RngCore + CryptoRng>(
+    ek: &[u8],
+    rng: &mut R,
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    let k = P::K::to_usize();
+    let ek_pke_size = ENCODE_12 * k;
+
     // Step 1. (Type check) Validate the key length
-    if ek.len() != ENCODE_12 * k + 32 {
-        return Err("Key length validation failed".into());
+    if ek.len() != ek_pke_size + 32 {
+        return Err(KemError::InvalidInput);
     }
 
     // Step 2. modulus check ek~ <- ByteEncode12(ByteDecode12(ek))
-    // TODO: this is wrong, the entire things should be equal, not portions
-    // TODO: make this fixed-time
-    let ek_decoded = byte_decode::<P::Encode12>(ek);
-    let ek_encoded = byte_encode::<P::Encode12>(&ek_decoded.coefs);
-    assert_eq!(ek[0..384], ek_encoded);
-
-    if ek_encoded != ek[0..384] {
-        // Compare byte-wise
-        return Err("Modulus check failed: Key is not consistent after encode-decode cycle".into());
+    // Using constant-time comparison to prevent timing attacks
+    let mut ek_reencoded = Vec::with_capacity(ek_pke_size);
+    for i in 0..k {
+        let poly_slice = &ek[i * ENCODE_12..(i + 1) * ENCODE_12];
+        let decoded = NttElement::byte_decode_12(poly_slice)?;
+        ek_reencoded = decoded.byte_encode_12(ek_reencoded);
     }
 
+    // Constant-time comparison
+    let comparison = ek_reencoded.ct_eq(&ek[0..ek_pke_size]);
+    if comparison.unwrap_u8() != 1 {
+        // Zeroize before returning error
+        ek_reencoded.zeroize();
+        return Err(KemError::InvalidInput);
+    }
+    ek_reencoded.zeroize();
+
     // Step 3. Generate 32 random bytes (see Section 3.3)
-    let mut rng = thread_rng();
     let mut m = [0_u8; 32];
     rng.fill_bytes(&mut m);
 
@@ -42,10 +60,14 @@ pub fn mlkem_encaps<P: ParameterSet>(ek: &[u8]) -> Result<(Vec<u8>, Vec<u8>), St
     let h_ek = hash_to_slice(ek, 32);
 
     // Step 5. Concatenate m and h_ek, and hash to derive K and r
-    let (K, r) = derive_keys(&m, &h_ek);
+    let (K, mut r) = derive_keys(&m, &h_ek);
 
     // Step 6. Encrypt the message
     let c = k_pke_encrypt::<P>(ek, &m, &r)?;
+
+    // Zeroize sensitive intermediate values
+    m.zeroize();
+    r.zeroize();
 
     Ok((K, c))
 }
@@ -70,9 +92,10 @@ pub(crate) fn k_pke_encrypt<P: ParameterSet>(
     ek_pke: &[u8],
     m: &[u8],
     rand: &[u8],
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>> {
+    let k = P::K::to_usize();
     let mut n = 0;
-    let mut t_hat = [NttElement::zero(); k];
+    let mut t_hat = Array::<NttElement, P::K>::default();
 
     for i in 0..t_hat.len() {
         t_hat[i] = NttElement::byte_decode_12(&ek_pke[i * ENCODE_12..(i + 1) * ENCODE_12])?;
@@ -81,29 +104,29 @@ pub(crate) fn k_pke_encrypt<P: ParameterSet>(
     let rho: &[u8] = &ek_pke[ENCODE_12 * k..(ENCODE_12 * k) + 32];
 
     // Generate the matrix a_hat^T
-    let mut a_hat_transpose = [NttElement::zero(); k * k];
+    let mut a_hat_transpose = Array::<NttElement, P::KSquared>::default();
     for i in 0..k {
         for j in 0..k {
             a_hat_transpose[i * k + j] = NttElement::sample_ntt(rho, i, j);
         }
     }
 
-    // generate r, run ntt k times
-    let mut r_hat = [NttElement::zero(); k];
-    for r_elem in r_hat.iter_mut().take(k) {
-        *r_elem = RingElement::sample_poly_cbd(rand, n).into();
+    // generate r, run ntt k times (uses EtaTwo)
+    let mut r_hat = Array::<NttElement, P::K>::default();
+    for r_elem in r_hat.iter_mut() {
+        *r_elem = RingElement::sample_poly_cbd::<P::EtaTwo>(rand, n).into();
         n += 1;
     }
 
-    // generate e1
-    let mut e_1 = [RingElement::zero(); k];
-    for e_elem in e_1.iter_mut().take(k) {
-        *e_elem = RingElement::sample_poly_cbd(rand, n);
+    // generate e1 (uses EtaTwo)
+    let mut e_1 = Array::<RingElement, P::K>::default();
+    for e_elem in e_1.iter_mut() {
+        *e_elem = RingElement::sample_poly_cbd::<P::EtaTwo>(rand, n);
         n += 1;
     }
 
-    // sample e2
-    let e2: RingElement = RingElement::sample_poly_cbd(rand, n);
+    // sample e2 (uses EtaTwo)
+    let e2: RingElement = RingElement::sample_poly_cbd::<P::EtaTwo>(rand, n);
 
     let mut u: Vec<RingElement> = e_1
         .iter()

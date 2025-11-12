@@ -8,12 +8,19 @@ use sha3::{
     digest::{ExtendableOutput, Update, XofReader},
     Shake256,
 };
+use typenum::Unsigned;
 
 /// A polynomial is an element of the ring R. It is an array of 256 coefficients
 /// which themselves are [F].
 #[derive(Clone, Copy)]
 pub struct RingElement {
     pub coefs: [F; n],
+}
+
+impl Default for RingElement {
+    fn default() -> Self {
+        Self::zero()
+    }
 }
 
 impl RingElement {
@@ -26,30 +33,30 @@ impl RingElement {
         [F::new(0); n].into()
     }
 
-    // TODO: make eta const/generic
-    pub fn sample_poly_cbd(s: &[u8], b: u8) -> RingElement {
+    pub fn sample_poly_cbd<Eta: Unsigned>(s: &[u8], b: u8) -> RingElement {
         let mut prf = Shake256::default();
         prf.update(s);
         prf.update(&[b]);
 
-        // this should be 64 * eta
-        let mut b = [0u8; 128];
+        // Buffer size is 64 * eta
+        let buf_size = 64 * Eta::USIZE;
+        let mut buf = alloc::vec![0u8; buf_size];
         let mut reader = prf.finalize_xof();
-        reader.read(&mut b);
+        reader.read(&mut buf);
 
         let mut f = [F::new(0); n];
 
         for i in (0..n).step_by(2) {
             // Iterate through indices, stepping by 2.
-            let b = b[i / 2];
-            let b_7 = (b >> 7) & 1;
-            let b_6 = (b >> 6) & 1;
-            let b_5 = (b >> 5) & 1;
-            let b_4 = (b >> 4) & 1;
-            let b_3 = (b >> 3) & 1;
-            let b_2 = (b >> 2) & 1;
-            let b_1 = (b >> 1) & 1;
-            let b_0 = b & 1;
+            let byte = buf[i / 2];
+            let b_7 = (byte >> 7) & 1;
+            let b_6 = (byte >> 6) & 1;
+            let b_5 = (byte >> 5) & 1;
+            let b_4 = (byte >> 4) & 1;
+            let b_3 = (byte >> 3) & 1;
+            let b_2 = (byte >> 2) & 1;
+            let b_1 = (byte >> 1) & 1;
+            let b_0 = byte & 1;
 
             f[i] = F::new((b_0 + b_1).into()) - F::new((b_2 + b_3).into());
             // Ensure i+1 doesn't go out of bounds, relevant if N is odd.

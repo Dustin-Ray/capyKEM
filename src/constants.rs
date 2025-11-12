@@ -19,12 +19,13 @@ pub mod ml_kem_constants {
 // appendix table 2
 pub mod parameter_sets {
     use crate::math::encoding::EncodingSize;
+    use hybrid_array::ArraySize;
     use typenum::{Unsigned, U10, U11, U12, U16, U2, U3, U4, U5, U9};
 
     pub trait ParameterSet {
         // Define each parameter as an associated type.
-        type K: Unsigned;
-        type KSquared: Unsigned;
+        type K: Unsigned + ArraySize;
+        type KSquared: Unsigned + ArraySize;
         type EtaOne: Unsigned;
         type EtaTwo: Unsigned;
         type Du: EncodingSize;

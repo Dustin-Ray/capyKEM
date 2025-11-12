@@ -12,9 +12,9 @@ THIS LIBRARY IS A DRAFT AND IS NOT SAFE FOR USE. It exists for acedemic exeperim
 - [x] pt 1: implement API-level functions
   - [ ] pt 2: make them MAL-BIND secure based on analysis below 
 - [ ] document in style of FIPS
-- [ ] support other two parameter sets
-- [ ] parameterize sample_poly_cbd over eta
-- [ ] replace usage of ```Vec``` with ```hybridarray```
+- [x] support other two parameter sets
+- [x] parameterize sample_poly_cbd over eta
+- [x] replace usage of ```Vec``` with ```hybridarray```
 
 
 ## Notions beyond IND-CCA:
